@@ -1,0 +1,56 @@
+/*
+ Theme Name: ITU Shop Theme
+ Theme URI: http://localhost/itu_shop
+ Author: ITU Intern
+ Author URI: http://localhost
+ Description: A custom theme for the ITU Shop prototype
+ Version: 1.0
+ Text Domain: itu-shop-theme
+*/
+/* Basic Reset and Styling */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+}
+header {
+    background: #f8f8f8;
+    padding: 1rem;
+    text-align: center;
+}
+nav {
+    background-color: #4B92DB; /* ITU primary color */
+    padding: 0.5rem;
+}
+nav ul {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+nav ul li:first-child {
+    margin-right: auto; 
+}
+nav ul li:not(:first-child) {
+    margin-left: 1.5rem; 
+}
+nav ul li a {
+    text-decoration: none;
+    color: #fcfcfc;
+    font-size: 1rem;
+}
+nav ul li a:hover {
+    text-decoration: underline;
+}
+footer {
+    background: #f8f8f8;
+    padding: 1rem;
+    text-align: center;
+    margin-top: 2rem;
+}
