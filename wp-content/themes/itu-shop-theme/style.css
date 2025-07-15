@@ -1,14 +1,14 @@
 /*
- Theme Name: ITU Shop Theme
- Theme URI: http://localhost/itu_shop
- Author: ITU Intern
- Author URI: http://localhost
- Description: A custom theme for the ITU Shop prototype
- Version: 1.0
- Text Domain: itu-shop-theme
-*/
-/* Basic Reset and Styling */
-* {
+   Theme Name: ITU Shop Theme
+   Theme URI: http://localhost/itu_shop
+   Author: ITU Intern
+   Author URI: http://localhost
+   Description: A custom theme for the ITU Shop prototype
+   Version: 1.0
+   Text Domain: itu-shop-theme
+  */
+  /* Basic Reset and Styling */
+  * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -53,4 +53,99 @@ footer {
     padding: 1rem;
     text-align: center;
     margin-top: 2rem;
+}
+
+.home-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+.category-filter {
+    margin-bottom: 1rem;
+}
+.category-filter select {
+    padding: 0.5rem;
+    border: 1px solid #4B92DB;
+    border-radius: 4px;
+    font-size: 1rem;
+    background: #ffffff;
+    cursor: pointer;
+}
+.category-filter select:hover {
+    background: #f0f4f8;
+}
+
+.home-content .product-grid {
+    display: flex !important; /* Force flexbox */
+    flex-wrap: wrap !important;
+    gap: 1rem;
+    width: 100%;
+    justify-content: space-between;
+    align-items: stretch; /* Ensure cards align properly */
+}
+.home-content .product-card {
+    flex: 1 1 23% !important; /* Force 4-column layout */
+    text-align: center;
+    padding: 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background: #ffffff;
+    box-sizing: border-box;
+    display: flex !important;
+    flex-direction: column;
+    min-width: 200px;
+    max-width: 23%; /* Cap width for consistency */
+}
+.image-placeholder {
+    width: 100%;
+    height: 150px;
+    background-color: #d0d0d0; /* Darker for visibility */
+    margin-bottom: 0.5rem;
+    border: 1px solid #ccc; /* Add border for debugging */
+}
+.product-card h3 {
+    font-size: 1.2rem;
+    margin: 0.5rem 0;
+}
+.product-card .price {
+    color: #4B92DB;
+    font-weight: bold;
+}
+.product-card .stock-status {
+    color: #666;
+    font-size: 0.9rem;
+}
+.product-card .product-link {
+    color: #333;
+    text-decoration: none;
+}
+.product-card .product-link:hover {
+    text-decoration: underline;
+}
+.pagination {
+    margin-top: 1rem;
+    text-align: center;
+}
+.pagination-link {
+    padding: 0.5rem 1rem;
+    margin: 0 0.5rem;
+    background: #4B92DB;
+    color: #ffffff;
+    text-decoration: none;
+    border-radius: 4px;
+}
+.pagination-link:hover {
+    background: #3a78b0;
+}
+@media (max-width: 768px) {
+    .home-content .product-card {
+        flex: 1 1 48% !important;
+        max-width: 48%;
+    }
+}
+@media (max-width: 480px) {
+    .home-content .product-card {
+        flex: 1 1 100% !important;
+        max-width: 100%;
+    }
 }
