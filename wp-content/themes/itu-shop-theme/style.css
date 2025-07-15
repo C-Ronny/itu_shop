@@ -7,25 +7,30 @@
    Version: 1.0
    Text Domain: itu-shop-theme
   */
+
   /* Basic Reset and Styling */
   * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
+
 body {
     font-family: Arial, sans-serif;
     line-height: 1.6;
 }
+
 header {
     background: #f8f8f8;
     padding: 1rem;
     text-align: center;
 }
+
 nav {
     background-color: #4B92DB; /* ITU primary color */
     padding: 0.5rem;
 }
+
 nav ul {
     list-style: none;
     display: flex;
@@ -34,20 +39,25 @@ nav ul {
     margin: 0 auto;
     padding: 0 1rem;
 }
+
 nav ul li:first-child {
     margin-right: auto; 
 }
+
 nav ul li:not(:first-child) {
     margin-left: 1.5rem; 
 }
+
 nav ul li a {
     text-decoration: none;
     color: #fcfcfc;
     font-size: 1rem;
 }
+
 nav ul li a:hover {
     text-decoration: underline;
 }
+
 footer {
     background: #f8f8f8;
     padding: 1rem;
@@ -60,20 +70,6 @@ footer {
     margin: 0 auto;
     padding: 2rem;
 }
-.category-filter {
-    margin-bottom: 1rem;
-}
-.category-filter select {
-    padding: 0.5rem;
-    border: 1px solid #4B92DB;
-    border-radius: 4px;
-    font-size: 1rem;
-    background: #ffffff;
-    cursor: pointer;
-}
-.category-filter select:hover {
-    background: #f0f4f8;
-}
 
 .home-content .product-grid {
     display: flex !important; /* Force flexbox */
@@ -82,7 +78,9 @@ footer {
     width: 100%;
     justify-content: space-between;
     align-items: stretch; /* Ensure cards align properly */
+    min-height: 200px; /* Ensure minimum height for grid */
 }
+
 .home-content .product-card {
     flex: 1 1 23% !important; /* Force 4-column layout */
     text-align: center;
@@ -95,57 +93,168 @@ footer {
     flex-direction: column;
     min-width: 200px;
     max-width: 23%; /* Cap width for consistency */
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+
+.home-content .product-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
 .image-placeholder {
     width: 100%;
     height: 150px;
     background-color: #d0d0d0; /* Darker for visibility */
     margin-bottom: 0.5rem;
     border: 1px solid #ccc; /* Add border for debugging */
-}
-.product-card h3 {
-    font-size: 1.2rem;
-    margin: 0.5rem 0;
-}
-.product-card .price {
-    color: #4B92DB;
-    font-weight: bold;
-}
-.product-card .stock-status {
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: #666;
     font-size: 0.9rem;
 }
-.product-card .product-link {
+
+.image-placeholder::before {
+    content: "No Image";
+}
+
+.product-card h3 {
+    font-size: 1.2rem;
+    margin: 0.5rem 0;
     color: #333;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.product-card .price {
+    color: #4B92DB;
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin: 0.5rem 0;
+}
+
+.product-card .stock-status {
+    color: #666;
+    font-size: 0.9rem;
+    margin: 0.25rem 0;
+}
+
+.product-card .product-link {
+    color: #4B92DB;
     text-decoration: none;
+    margin-top: auto;
+    padding: 0.5rem;
+    border: 1px solid #4B92DB;
+    border-radius: 4px;
+    transition: all 0.3s ease;
 }
+
 .product-card .product-link:hover {
-    text-decoration: underline;
+    background: #4B92DB;
+    color: white;
 }
+
 .pagination {
-    margin-top: 1rem;
+    margin-top: 2rem;
     text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
 }
+
 .pagination-link {
     padding: 0.5rem 1rem;
-    margin: 0 0.5rem;
     background: #4B92DB;
     color: #ffffff;
     text-decoration: none;
     border-radius: 4px;
+    transition: background-color 0.3s ease;
 }
+
 .pagination-link:hover {
     background: #3a78b0;
 }
+
+.page-info {
+    color: #666;
+    font-size: 0.9rem;
+    padding: 0.5rem;
+}
+
+/* No Results Message */
+.no-results {
+    width: 100%;
+    text-align: center;
+    padding: 2rem;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    margin-top: 1rem;
+}
+
+.no-results p {
+    color: #666;
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+/* Loading state */
+.loading {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
+    .home-content {
+        padding: 1rem;
+    }
+    
     .home-content .product-card {
         flex: 1 1 48% !important;
         max-width: 48%;
     }
+    
+    .pagination {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .pagination-link {
+        padding: 0.75rem 1.5rem;
+    }
 }
+
 @media (max-width: 480px) {
     .home-content .product-card {
         flex: 1 1 100% !important;
         max-width: 100%;
+    }
+}
+
+/* Debug styles (remove in production) */
+.debug {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+    .product-card,
+    .pagination-link {
+        transition: none;
+    }
+    
+    .product-card:hover {
+        transform: none;
     }
 }
