@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function fetchProducts(page) {
       // Fallback to server-side if ituAjax is undefined
-      if (typeof ituAjax === 'undefined' || !ituAjax.ajax_url) {
+      if (typeof ituAjax === 'undefined' || !ituAjax.rest_url) {
           console.warn('ituAjax not defined, falling back to server-side pagination');
           const url = new URL(window.location);
           url.searchParams.set('page', page);
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
           return;
       }
 
-      const apiUrl = `${ituAjax.ajax_url}?action=fetch_products&page=${page}&nonce=${ituAjax.nonce}`;
+      const apiUrl = `${ituAjax.rest_url}?page=${page}`;
       console.log('Fetching products from:', apiUrl);
       
       grid.innerHTML = '<div class="loading">Loading...</div>';
@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
       fetch(apiUrl, {
           method: 'GET',
           headers: {
-              'X-Requested-With': 'XMLHttpRequest'
+              'X-WP-Nonce': ituAjax.nonce
           }
       })
       .then(response => {
@@ -59,27 +59,64 @@ document.addEventListener('DOMContentLoaded', function() {
               console.error('Parse error:', e, 'Response text:', text.substring(0, 200));
               throw new Error('Invalid JSON response');
           }
-          if (data.success) {
-              grid.innerHTML = data.data.html;
-              updatePaginationLinks(page, data.data.total_pages);
-              console.log(`Loaded ${data.data.product_count} products for page ${page}`);
+          if (response.ok && data.products) {
+              renderProducts(data.products);
+              updatePaginationLinks(page, data.total_pages, data.links);
+              console.log(`Loaded ${data.product_count} products for page ${page}`);
           } else {
-              console.error('Error fetching products:', data.data.message);
-              grid.innerHTML = '<p>Error loading products: ' + data.data.message + '</p>';
+              console.error('Error fetching products:', data.message || 'Unknown error');
+              grid.innerHTML = '<p>Error loading products: ' + (data.message || 'Unknown error') + '</p>';
           }
       })
       .catch(error => {
           console.error('Fetch error:', error);
           grid.innerHTML = '<p>Error loading products: ' + error.message + '</p>';
           // Fallback to server-side pagination
-          console.warn('AJAX failed, falling back to server-side pagination');
+          console.warn('REST API failed, falling back to server-side pagination');
           const url = new URL(window.location);
           url.searchParams.set('page', page);
           window.location.href = url.toString();
       });
   }
 
-  function updatePaginationLinks(currentPage, totalPages) {
+  function renderProducts(products) {
+      if (!products || products.length === 0) {
+          grid.innerHTML = '<p>No products available.</p>';
+          return;
+      }
+
+      let html = '';
+      products.forEach(product => {
+          const title = product.name || 'Unnamed Product';
+          const price = product.price?.value || '0.00';
+          const currency = product.price?.currencyIso || 'CHF';
+          const stockStatus = product.stock?.stockLevelStatus || 'unknown';
+          const productCode = product.code || '';
+
+          html += `
+              <div class="product-card">
+                  <div class="image-placeholder"></div>
+                  <h3>${escapeHtml(title)}</h3>
+                  <p class="price">${escapeHtml(numberFormat(price, 2))} ${escapeHtml(currency)}</p>
+                  <p class="stock-status">Stock: ${escapeHtml(stockStatus)}</p>
+                  <a href="#" class="product-link" data-product-code="${escapeHtml(productCode)}">${escapeHtml(title)}</a>
+              </div>
+          `;
+      });
+      grid.innerHTML = html;
+  }
+
+  function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+  }
+
+  function numberFormat(value, decimals) {
+      return Number(value).toFixed(decimals);
+  }
+
+  function updatePaginationLinks(currentPage, totalPages, links) {
       const paginationDiv = document.querySelector('.pagination');
       currentPage = parseInt(currentPage);
       totalPages = parseInt(totalPages);
@@ -87,16 +124,18 @@ document.addEventListener('DOMContentLoaded', function() {
       let html = '';
       const baseUrl = removeQueryParam(window.location.href, 'page');
       
-      if (currentPage > 0) {
-          const prevUrl = addQueryParam(baseUrl, 'page', currentPage - 1);
-          html += `<a href="${prevUrl}" class="pagination-link" data-page="${currentPage - 1}">Previous</a>`;
+      if (links.prev) {
+          const prevPage = currentPage - 1;
+          const prevUrl = addQueryParam(baseUrl, 'page', prevPage);
+          html += `<a href="${prevUrl}" class="pagination-link" data-page="${prevPage}">Previous</a>`;
       }
       
       html += `<span class="page-info">Page ${currentPage + 1} of ${totalPages}</span>`;
       
-      if (currentPage < totalPages - 1 && totalPages > 1) {
-          const nextUrl = addQueryParam(baseUrl, 'page', currentPage + 1);
-          html += `<a href="${nextUrl}" class="pagination-link" data-page="${currentPage + 1}">Next</a>`;
+      if (links.next) {
+          const nextPage = currentPage + 1;
+          const nextUrl = addQueryParam(baseUrl, 'page', nextPage);
+          html += `<a href="${nextUrl}" class="pagination-link" data-page="${nextPage}">Next</a>`;
       }
       
       paginationDiv.innerHTML = html;
