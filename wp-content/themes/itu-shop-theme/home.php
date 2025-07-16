@@ -4,7 +4,7 @@
    */
   get_header(); ?>
   <div class="home-content">
-      <h1>Welcome to ITU Shop</h1>
+      <h1 id="welcome">Welcome to ITU Shop</h1>
       <?php
       $client_id = 'itu_publication';
       $client_secret = '7S0h4$NQK5$6';

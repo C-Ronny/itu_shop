@@ -29,6 +29,8 @@ header {
 nav {
     background-color: #4B92DB; /* ITU primary color */
     padding: 0.5rem;
+    position: fixed;
+    width: 100vw;    
 }
 
 nav ul {
@@ -65,9 +67,13 @@ footer {
     margin-top: 2rem;
 }
 
+#welcome{
+    margin-top: 50px;
+}
+
 .home-content {
     max-width: 1200px;
-    margin: 0 auto;
+    margin: 0 auto;    
     padding: 2rem;
 }
 
