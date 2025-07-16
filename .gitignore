@@ -1,0 +1,9 @@
+# WordPress
+wp-config.php
+wp-content/uploads/
+wp-content/cache/
+*.log
+# Composer
+vendor/
+# Environment files
+.env
