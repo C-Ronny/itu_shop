@@ -1,42 +1,103 @@
 document.addEventListener('DOMContentLoaded', function() {
   const grid = document.getElementById('product-grid');
   const paginationLinks = document.querySelectorAll('.pagination-link');
+  const categoryFilter = document.getElementById('category-filter');
   
-  if (!grid) {
-      console.error('Required element not found:', { grid });
+  if (!grid || !categoryFilter) {
+      console.error('Required elements not found:', { grid: !!grid, categoryFilter: !!categoryFilter });
       return;
   }
 
   const initialCards = Array.from(grid.getElementsByClassName('product-card'));
   console.log('Found ' + initialCards.length + ' product cards on load.');
   
-  // Debug: Log all products
   initialCards.forEach((card, index) => {
       const cardName = card.querySelector('h3')?.textContent || 'Unknown';
       console.log(`Product ${index + 1}: "${cardName}"`);
   });
 
-  // Handle pagination clicks
+  // Verify ituAjax
+  if (!ituAjax || !ituAjax.categories_url || !ituAjax.nonce) {
+      console.error('ituAjax not properly initialized:', { ituAjax });
+      categoryFilter.innerHTML = '<li>Categories Unavailable: Script error</li>';
+      return;
+  }
+  console.log('ituAjax:', { rest_url: ituAjax.rest_url, categories_url: ituAjax.categories_url, nonce: ituAjax.nonce });
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialCategory = urlParams.get('category') || '';
+  console.log('Initial category from URL:', initialCategory);
+
+  // Fetch categories
+  console.log('Fetching categories from:', ituAjax.categories_url);
+  fetch(ituAjax.categories_url, {
+      method: 'GET',
+      headers: {
+          'X-WP-Nonce': ituAjax.nonce
+      }
+  })
+  .then(response => {
+      console.log('Categories response:', { status: response.status, ok: response.ok });
+      return response.text().then(text => ({ response, text }));
+  })
+  .then(({ response, text }) => {
+      let data;
+      try {
+          data = JSON.parse(text);
+          console.log('Parsed categories data:', data);
+      } catch (e) {
+          console.error('Categories parse error:', e, 'Response text:', text.substring(0, 200));
+          throw new Error('Invalid JSON response');
+      }
+      if (response.ok && Array.isArray(data)) {
+          let html = `<li data-category="" class="${initialCategory === '' ? 'active' : ''}">All Products</li>`;
+          data.forEach(category => {
+              html += `<li data-category="${category.id}" class="${category.id === initialCategory ? 'active' : ''}">${escapeHtml(category.name)}</li>`;
+          });
+          categoryFilter.innerHTML = html;
+          console.log('Rendered categories:', html);
+          
+          categoryFilter.querySelectorAll('li').forEach(li => {
+              li.addEventListener('click', function() {
+                  categoryFilter.querySelectorAll('li').forEach(l => l.classList.remove('active'));
+                  this.classList.add('active');
+                  const category = this.getAttribute('data-category');
+                  console.log('Category clicked:', category);
+                  fetchProducts(0, category);
+              });
+          });
+      } else {
+          console.error('Error fetching categories:', data.message || 'Unknown error', 'Status:', response.status);
+          categoryFilter.innerHTML = '<li>Categories Unavailable: Server error</li>';
+      }
+  })
+  .catch(error => {
+      console.error('Categories fetch error:', error.message);
+      categoryFilter.innerHTML = '<li>Categories Unavailable: Network error</li>';
+  });
+
   paginationLinks.forEach(link => {
       link.addEventListener('click', function(e) {
           e.preventDefault();
           const page = this.getAttribute('data-page');
-          console.log('Navigating to page:', page);
-          fetchProducts(page);
+          const category = this.getAttribute('data-category') || initialCategory;
+          console.log('Navigating to page:', page, 'Category:', category);
+          fetchProducts(page, category);
       });
   });
 
-  function fetchProducts(page) {
-      // Fallback to server-side if ituAjax is undefined
-      if (typeof ituAjax === 'undefined' || !ituAjax.rest_url) {
-          console.warn('ituAjax not defined, falling back to server-side pagination');
+  function fetchProducts(page, category = '') {
+      if (typeof ituAjax === 'undefined' || !ituAjax.rest_url || !ituAjax.nonce) {
+          console.warn('ituAjax not defined or incomplete:', { rest_url: ituAjax?.rest_url, nonce: ituAjax?.nonce }, 'Falling back to server-side pagination');
           const url = new URL(window.location);
           url.searchParams.set('page', page);
+          if (category) url.searchParams.set('category', category);
+          else url.searchParams.delete('category');
           window.location.href = url.toString();
           return;
       }
 
-      const apiUrl = `${ituAjax.rest_url}?page=${page}`;
+      const apiUrl = `${ituAjax.rest_url}?page=${page}${category ? `&category=${category}` : ''}`;
       console.log('Fetching products from:', apiUrl);
       
       grid.innerHTML = '<div class="loading">Loading...</div>';
@@ -48,33 +109,43 @@ document.addEventListener('DOMContentLoaded', function() {
           }
       })
       .then(response => {
-          console.log('Response status:', response.status, 'OK:', response.ok);
+          console.log('Products response:', { status: response.status, ok: response.ok });
           return response.text().then(text => ({ response, text }));
       })
       .then(({ response, text }) => {
           let data;
           try {
               data = JSON.parse(text);
+              console.log('Parsed products data:', data);
           } catch (e) {
               console.error('Parse error:', e, 'Response text:', text.substring(0, 200));
               throw new Error('Invalid JSON response');
           }
           if (response.ok && data.products) {
-              renderProducts(data.products);
-              updatePaginationLinks(page, data.total_pages, data.links);
-              console.log(`Loaded ${data.product_count} products for page ${page}`);
+              let filteredProducts = data.products;
+              if (category) {
+                  const categoryEncoded = category.replace(/[\(\)]/g, m => m === '(' ? '%28' : '%29');
+                  filteredProducts = data.products.filter(product => 
+                      product.url.includes(`/${categoryEncoded}-`)
+                  );
+                  console.log('Filtered products:', filteredProducts.length, 'Category:', category);
+              }
+              renderProducts(filteredProducts);
+              updatePaginationLinks(page, data.total_pages, data.links, category);
+              console.log(`Loaded ${filteredProducts.length} products for page ${page}, category: ${category || 'none'}`);
           } else {
-              console.error('Error fetching products:', data.message || 'Unknown error');
+              console.error('Error fetching products:', data.message || 'Unknown error', 'Status:', response.status);
               grid.innerHTML = '<p>Error loading products: ' + (data.message || 'Unknown error') + '</p>';
           }
       })
       .catch(error => {
-          console.error('Fetch error:', error);
+          console.error('Products fetch error:', error.message);
           grid.innerHTML = '<p>Error loading products: ' + error.message + '</p>';
-          // Fallback to server-side pagination
           console.warn('REST API failed, falling back to server-side pagination');
           const url = new URL(window.location);
           url.searchParams.set('page', page);
+          if (category) url.searchParams.set('category', category);
+          else url.searchParams.delete('category');
           window.location.href = url.toString();
       });
   }
@@ -116,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
       return Number(value).toFixed(decimals);
   }
 
-  function updatePaginationLinks(currentPage, totalPages, links) {
+  function updatePaginationLinks(currentPage, totalPages, links, category = '') {
       const paginationDiv = document.querySelector('.pagination');
       currentPage = parseInt(currentPage);
       totalPages = parseInt(totalPages);
@@ -126,26 +197,27 @@ document.addEventListener('DOMContentLoaded', function() {
       
       if (links.prev) {
           const prevPage = currentPage - 1;
-          const prevUrl = addQueryParam(baseUrl, 'page', prevPage);
-          html += `<a href="${prevUrl}" class="pagination-link" data-page="${prevPage}">Previous</a>`;
+          const prevUrl = category ? addQueryParam(baseUrl, ['page', prevPage, 'category', category]) : addQueryParam(baseUrl, 'page', prevPage);
+          html += `<a href="${prevUrl}" class="pagination-link" data-page="${prevPage}" data-category="${category}">Previous</a>`;
       }
       
       html += `<span class="page-info">Page ${currentPage + 1} of ${totalPages}</span>`;
       
       if (links.next) {
           const nextPage = currentPage + 1;
-          const nextUrl = addQueryParam(baseUrl, 'page', nextPage);
-          html += `<a href="${nextUrl}" class="pagination-link" data-page="${nextPage}">Next</a>`;
+          const nextUrl = category ? addQueryParam(baseUrl, ['page', nextPage, 'category', category]) : addQueryParam(baseUrl, 'page', nextPage);
+          html += `<a href="${nextUrl}" class="pagination-link" data-page="${nextPage}" data-category="${category}">Next</a>`;
       }
       
       paginationDiv.innerHTML = html;
       
-      // Reattach event listeners
       document.querySelectorAll('.pagination-link').forEach(link => {
           link.addEventListener('click', function(e) {
               e.preventDefault();
               const page = this.getAttribute('data-page');
-              fetchProducts(page);
+              const cat = this.getAttribute('data-category');
+              console.log('Pagination clicked:', { page, category: cat });
+              fetchProducts(page, cat);
           });
       });
   }
@@ -158,7 +230,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function addQueryParam(baseUrl, param, value) {
       const url = new URL(baseUrl);
-      url.searchParams.set(param, value);
+      if (Array.isArray(param)) {
+          param[0] === 'page' ? url.searchParams.set('page', param[1]) : url.searchParams.set('category', param[3]);
+          param[0] === 'category' ? url.searchParams.set('category', param[1]) : url.searchParams.set('page', param[3]);
+      } else {
+          url.searchParams.set(param, value);
+      }
       return url.toString();
+  }
+
+  if (initialCategory) {
+      console.log('Initial fetch with category:', initialCategory);
+      fetchProducts(0, initialCategory);
   }
 });

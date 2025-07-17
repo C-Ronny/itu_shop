@@ -4,12 +4,12 @@
    Author: ITU Intern
    Author URI: http://localhost
    Description: A custom theme for the ITU Shop prototype
-   Version: 1.0
+   Version: 1.1
    Text Domain: itu-shop-theme
-  */
+*/
 
-  /* Basic Reset and Styling */
-  * {
+/* Basic Reset and Styling */
+* {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -27,7 +27,7 @@ header {
 }
 
 nav {
-    background-color: #4B92DB; /* ITU primary color */
+    background-color: #4B92DB;
     padding: 0.5rem;
     position: fixed;
     width: 100vw;    
@@ -67,7 +67,7 @@ footer {
     margin-top: 2rem;
 }
 
-#welcome{
+#welcome {
     margin-top: 50px;
 }
 
@@ -77,18 +77,38 @@ footer {
     padding: 2rem;
 }
 
+/* Category Filter */
+ul#category-filter {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    list-style: none;
+    margin-bottom: 1rem;
+}
+
+ul#category-filter li {
+    cursor: pointer;
+    color: #4B92DB;
+    font-size: 1rem;
+}
+
+ul#category-filter li:hover,
+ul#category-filter li.active {
+    color: #6badeb;
+}
+
 .home-content .product-grid {
-    display: flex !important; /* Force flexbox */
+    display: flex !important;
     flex-wrap: wrap !important;
     gap: 1rem;
     width: 100%;
     justify-content: space-between;
-    align-items: stretch; /* Ensure cards align properly */
-    min-height: 200px; /* Ensure minimum height for grid */
+    align-items: stretch;
+    min-height: 200px;
 }
 
 .home-content .product-card {
-    flex: 1 1 23% !important; /* Force 4-column layout */
+    flex: 1 1 23% !important;
     text-align: center;
     padding: 1rem;
     border: 1px solid #e0e0e0;
@@ -98,7 +118,7 @@ footer {
     display: flex !important;
     flex-direction: column;
     min-width: 200px;
-    max-width: 23%; /* Cap width for consistency */
+    max-width: 23%;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -110,9 +130,9 @@ footer {
 .image-placeholder {
     width: 100%;
     height: 150px;
-    background-color: #d0d0d0; /* Darker for visibility */
+    background-color: #d0d0d0;
     margin-bottom: 0.5rem;
-    border: 1px solid #ccc; /* Add border for debugging */
+    border: 1px solid #ccc;
     border-radius: 4px;
     display: flex;
     align-items: center;
@@ -190,7 +210,6 @@ footer {
     padding: 0.5rem;
 }
 
-/* No Results Message */
 .no-results {
     width: 100%;
     text-align: center;
@@ -207,14 +226,12 @@ footer {
     margin: 0;
 }
 
-/* Loading state */
 .loading {
     text-align: center;
     padding: 2rem;
     color: #666;
 }
 
-/* Responsive Design */
 @media (max-width: 768px) {
     .home-content {
         padding: 1rem;
@@ -233,6 +250,11 @@ footer {
     .pagination-link {
         padding: 0.75rem 1.5rem;
     }
+    
+    ul#category-filter {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
 }
 
 @media (max-width: 480px) {
@@ -242,7 +264,6 @@ footer {
     }
 }
 
-/* Debug styles (remove in production) */
 .debug {
     background: #fff3cd;
     border: 1px solid #ffeaa7;
@@ -253,7 +274,6 @@ footer {
     font-size: 0.9rem;
 }
 
-/* Accessibility improvements */
 @media (prefers-reduced-motion: reduce) {
     .product-card,
     .pagination-link {
