@@ -6,8 +6,7 @@ get_header(); ?>
 <div class="home-content">
     <h1 id="welcome">Welcome to ITU Shop</h1>
     <ul id="category-filter">
-        <li data-category="" class="active">All Products</li>
-        <!-- Categories populated by JavaScript -->
+        <li data-category="" class="active">All Products</li>        
     </ul>
     <?php
     // Check for API credentials
