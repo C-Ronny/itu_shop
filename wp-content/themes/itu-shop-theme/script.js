@@ -103,137 +103,83 @@ document.addEventListener('DOMContentLoaded', function() {
         let currentPage = parseInt(page) || 0;
         let links = {};
 
-        if (!category) {
-            let collectedProducts = [];
-            let pageToFetch = 0;
-            totalPages = Infinity;
+        const cacheKey = category ? `${currentPage}_${category}` : `${currentPage}_all`;
+        let data;
 
-            while (pageToFetch < 80) {
-                const cacheKey = `${pageToFetch}_all`;
-                let data;
-
-                if (productCache[cacheKey]) {
-                    console.log(`Using cached products for page ${pageToFetch}, category: none`);
-                    data = productCache[cacheKey];
-                } else {
-                    const apiUrl = `${ituAjax.rest_url}?page=${pageToFetch}`;
-                    console.log('Fetching products from:', apiUrl);
-                    try {
-                        const response = await fetch(apiUrl, {
-                            method: 'GET',
-                            headers: { 'X-WP-Nonce': ituAjax.nonce }
-                        });
-                        console.log('Products response:', { status: response.status, ok: response.ok });
-                        const text = await response.text();
-                        try {
-                            data = JSON.parse(text);
-                            console.log('Parsed products data:', data);
-                        } catch (e) {
-                            console.error('Parse error:', e, 'Response text:', text.substring(0, 200));
-                            throw new Error('Invalid JSON response');
-                        }
-                        if (!response.ok || !data.products) {
-                            console.error('Error fetching products:', data.message || 'Unknown error', 'Status:', response.status);
-                            break;
-                        }
-                        productCache[cacheKey] = data;
-                    } catch (error) {
-                        console.error('Products fetch error:', error.message);
-                        break;
-                    }
+        if (productCache[cacheKey]) {
+            console.log(`Using cached products for page ${currentPage}, category: ${category || 'none'}`);
+            data = productCache[cacheKey];
+        } else {
+            const apiUrl = `${ituAjax.rest_url}?page=${currentPage}`;
+            console.log('Fetching products from:', apiUrl);
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: { 'X-WP-Nonce': ituAjax.nonce }
+                });
+                console.log('Products response:', { status: response.status, ok: response.ok });
+                const text = await response.text();
+                try {
+                    data = JSON.parse(text);
+                    console.log('Parsed products data:', data);
+                } catch (e) {
+                    console.error('Parse error:', e, 'Response text:', text.substring(0, 200));
+                    throw new Error('Invalid JSON response');
                 }
-
-                collectedProducts.push(...data.products);
-                totalPages = Math.min(totalPages, data.total_pages || Infinity);
-                pageToFetch++;
-                if (pageToFetch >= (data.total_pages || Infinity)) break;
+                if (!response.ok || !data.products) {
+                    console.error('Error fetching products:', data.message || 'Unknown error', 'Status:', response.status);
+                    grid.innerHTML = '<p>Error loading products: ' + (data.message || 'Unknown error') + '</p>';
+                    return;
+                }
+                productCache[cacheKey] = data;
+            } catch (error) {
+                console.error('Products fetch error:', error.message);
+                grid.innerHTML = '<p>Error loading products: ' + error.message + '</p>';
+                return;
             }
+        }
 
-            totalProducts = collectedProducts.length;
-            filteredProducts = collectedProducts.slice(currentPage * 12, (currentPage + 1) * 12);
-            totalPages = Math.ceil(totalProducts / 12);
-            console.log('Pagination debug:', { totalProducts, totalPages, currentPage, filteredProducts: filteredProducts.length });
-            links = {
+        if (!category) {
+            filteredProducts = data.products;
+            totalPages = data.total_pages || 1;
+            totalProducts = data.total_results || data.products.length;
+            links = data.links || {
                 prev: currentPage > 0 ? `${ituAjax.rest_url}?page=${currentPage - 1}` : null,
-                next: (currentPage + 1) < totalPages ? `${ituAjax.rest_url}?page=${currentPage + 1}` : null
+                next: currentPage < totalPages - 1 ? `${ituAjax.rest_url}?page=${currentPage + 1}` : null
             };
         } else {
             const normalizedCategory = normalizeCategory(category);
-            let collectedProducts = [];
-            let pageToFetch = 0;
-            totalPages = Infinity;
-
-            while (pageToFetch < 80) {
-                const cacheKey = `${pageToFetch}_${category}`;
-                let data;
-
-                if (productCache[cacheKey]) {
-                    console.log(`Using cached products for page ${pageToFetch}, category: ${category}`);
-                    data = productCache[cacheKey];
-                } else {
-                    const apiUrl = `${ituAjax.rest_url}?page=${pageToFetch}`;
-                    console.log('Fetching products from:', apiUrl);
-                    try {
-                        const response = await fetch(apiUrl, {
-                            method: 'GET',
-                            headers: { 'X-WP-Nonce': ituAjax.nonce }
-                        });
-                        console.log('Products response:', { status: response.status, ok: response.ok });
-                        const text = await response.text();
-                        try {
-                            data = JSON.parse(text);
-                            console.log('Parsed products data:', data);
-                        } catch (e) {
-                            console.error('Parse error:', e, 'Response text:', text.substring(0, 200));
-                            throw new Error('Invalid JSON response');
-                        }
-                        if (!response.ok || !data.products) {
-                            console.error('Error fetching products:', data.message || 'Unknown error', 'Status:', response.status);
-                            break;
-                        }
-                        productCache[cacheKey] = data;
-                    } catch (error) {
-                        console.error('Products fetch error:', error.message);
-                        break;
-                    }
+            filteredProducts = data.products.filter(product => {
+                const urlParts = product.url.split('/');
+                if (urlParts.length < 2) {
+                    console.log(`Skipping product: ${product.name}, invalid URL: ${product.url}`);
+                    return false;
                 }
+                const categorySegment = decodeURIComponent(urlParts[1]);
+                const normalizedProductCategory = normalizeCategory(categorySegment);
+                console.log(`Product: ${product.name}, Category segment: ${categorySegment} -> Normalized: ${normalizedProductCategory}, Target: ${normalizedCategory}`);
+                return normalizedProductCategory === normalizedCategory;
+            });
 
-                const matchingProducts = data.products.filter(product => {
-                    const urlParts = product.url.split('/');
-                    if (urlParts.length < 2) {
-                        console.log(`Skipping product: ${product.name}, invalid URL: ${product.url}`);
-                        return false;
-                    }
-                    const categorySegment = decodeURIComponent(urlParts[1]);
-                    const normalizedProductCategory = normalizeCategory(categorySegment);
-                    console.log(`Product: ${product.name}, Category segment: ${categorySegment} -> Normalized: ${normalizedProductCategory}, Target: ${normalizedCategory}`);
-                    return normalizedProductCategory === normalizedCategory;
-                });
-
-                collectedProducts.push(...matchingProducts);
-                totalPages = Math.min(totalPages, data.total_pages || Infinity);
-                pageToFetch++;
-                if (pageToFetch >= (data.total_pages || Infinity)) break;
-            }
-
-            totalProducts = collectedProducts.length;
-            filteredProducts = collectedProducts.slice(currentPage * 12, (currentPage + 1) * 12);
+            // For categories, estimate totalProducts and totalPages
+            totalProducts = data.total_results || filteredProducts.length;
             totalPages = Math.ceil(totalProducts / 12);
-            console.log('Pagination debug:', { totalProducts, totalPages, currentPage, filteredProducts: filteredProducts.length });
             links = {
                 prev: currentPage > 0 ? `${ituAjax.rest_url}?page=${currentPage - 1}${category ? '&category=' + encodeURIComponent(category) : ''}` : null,
                 next: (currentPage + 1) < totalPages ? `${ituAjax.rest_url}?page=${currentPage + 1}${category ? '&category=' + encodeURIComponent(category) : ''}` : null
             };
         }
 
+        console.log('Pagination debug:', { totalProducts, totalPages, currentPage, filteredProducts: filteredProducts.length });
+
         const productGrid = document.querySelector('.product-grid');
         let messageDiv = document.querySelector('.category-message');
         if (!messageDiv) {
             messageDiv = document.createElement('div');
             messageDiv.className = 'category-message';
-            productGrid.parentNode.insertBefore(messageDiv, productGrid.previousElementSibling);
+            productGrid.parentNode.insertBefore(messageDiv, productGrid);
         }
-        messageDiv.textContent = category ? `Showing ${totalProducts} products for ${category}` : `Showing ${totalProducts} products`;
+        messageDiv.textContent = category ? `Showing ${filteredProducts.length} products for ${category}` : `Showing ${totalProducts} products`;
 
         renderProducts(filteredProducts);
         updatePaginationLinks(currentPage, totalPages, links, category);

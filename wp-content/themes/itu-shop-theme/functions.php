@@ -11,13 +11,13 @@ add_action('after_setup_theme', 'itu_shop_theme_setup');
 
 // Enqueue Styles
 function itu_shop_theme_styles() {
-    wp_enqueue_style('itu-shop-theme-style', get_template_directory_uri() . '/style.css', array(), '1.1'); // Updated version to bust cache
+    wp_enqueue_style('itu-shop-theme-style', get_template_directory_uri() . '/style.css', array(), '1.1');
 }
 add_action('wp_enqueue_scripts', 'itu_shop_theme_styles');
 
 // Enqueue Scripts and Localize
 function itu_shop_theme_scripts() {
-    wp_enqueue_script('itu-shop-theme-script', get_template_directory_uri() . '/script.js', array(), '1.1', true); // Updated version
+    wp_enqueue_script('itu-shop-theme-script', get_template_directory_uri() . '/script.js', array(), '1.1', true);
     wp_localize_script('itu-shop-theme-script', 'ituAjax', array(
         'rest_url' => rest_url('itu/v1/products'),
         'categories_url' => rest_url('itu/v1/categories'),
@@ -32,7 +32,6 @@ function itu_debug_rest_registration() {
         error_log('ITU Shop: functions.php loaded');
         error_log('ITU Shop: REST endpoint itu/v1/products registered');
         error_log('ITU Shop: REST endpoint itu/v1/categories registered');
-        // Clear transient for testing
         delete_transient('itu_categories');
         error_log('ITU Shop: Cleared itu_categories transient');
     }
@@ -119,13 +118,14 @@ function itu_fetch_products_rest(WP_REST_Request $request) {
     $body = json_decode(wp_remote_retrieve_body($response), true);
     $products = $body['products'] ?? [];
     $total_pages = $body['pagination']['totalPages'] ?? 1;
+    $total_results = $body['pagination']['totalResults'] ?? count($products);
     
-    error_log('ITU Shop: API response - Total Pages: ' . $total_pages . ', Products: ' . count($products));
+    error_log('ITU Shop: API response - Total Pages: ' . $total_pages . ', Total Results: ' . $total_results . ', Products: ' . count($products));
 
     return array(
         'products' => $products,
         'total_pages' => $total_pages,
-        'product_count' => count($products),
+        'total_results' => $total_results,
         'links' => array(
             'prev' => $page > 0 ? rest_url('itu/v1/products?page=' . ($page - 1)) : null,
             'next' => $page < $total_pages - 1 ? rest_url('itu/v1/products?page=' . ($page + 1)) : null
@@ -135,7 +135,6 @@ function itu_fetch_products_rest(WP_REST_Request $request) {
 
 // REST handler for fetching categories
 function itu_fetch_categories_rest(WP_REST_Request $request) {
-    // Removed nonce verification for debugging
     error_log('ITU Shop: Accessing categories endpoint');
 
     if (!defined('ITU_API_CLIENT_ID') || !defined('ITU_API_CLIENT_SECRET')) {

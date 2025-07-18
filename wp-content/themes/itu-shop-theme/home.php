@@ -26,142 +26,79 @@ get_header(); ?>
         $normalized_category = $category;
         if ($category) {
             $normalized_category = strtolower($category);
-            $normalized_category = preg_replace('/\s*\(.*?\)/', '', $normalized_category); // Remove parentheses
-            $normalized_category = preg_replace('/\s+/', '-', $normalized_category); // Spaces to hyphens
-            $normalized_category = rtrim($normalized_category, '-'); // Remove trailing hyphen
+            $normalized_category = preg_replace('/\s*\(.*?\)/', '', $normalized_category);
+            $normalized_category = preg_replace('/\s+/', '-', $normalized_category);
+            $normalized_category = rtrim($normalized_category, '-');
         }
 
-        // Fetch products across pages if category is set
+        // Fetch products for the current page
         $products = [];
         $total_pages = 1;
         $total_results = 0;
 
-        if ($category) {
-            $page_to_fetch = 0;
-            $max_products = 9999; // Large number to collect all matching products
-            $collected_products = [];
+        $api_url = $base_api_url . '/products/search?currentPage=' . $current_page . '&fields=DEFAULT&pageSize=12';
+        if (WP_DEBUG) {
+            error_log('ITU Shop: Home page fetching products from ' . $api_url);
+        }
 
-            while ($page_to_fetch < 80) {
-                $api_url = $base_api_url . '/products/search?currentPage=' . $page_to_fetch . '&fields=DEFAULT&pageSize=12';
-                if (WP_DEBUG) {
-                    error_log('ITU Shop: Home page fetching products from ' . $api_url);
-                }
-
-                $access_token = get_transient('itu_access_token');
-                if (false === $access_token) {
-                    $token_response = wp_remote_post($token_url, array(
-                        'body' => array(
-                            'grant_type' => 'client_credentials',
-                            'client_id' => $client_id,
-                            'client_secret' => $client_secret,
-                        ),
-                    ));
-                    
-                    if (is_wp_error($token_response)) {
-                        echo '<p>Error fetching token: ' . esc_html($token_response->get_error_message()) . '</p>';
-                        break;
-                    } else {
-                        $token_body = json_decode(wp_remote_retrieve_body($token_response), true);
-                        $access_token = $token_body['access_token'] ?? '';
-                        if ($access_token) {
-                            set_transient('itu_access_token', $access_token, $token_body['expires_in'] - 60);
-                        }
-                    }
-                }
-                
-                if (empty($access_token)) {
-                    echo '<p>Error: No access token received.</p>';
-                    break;
-                }
-
-                $response = wp_remote_get($api_url, array(
-                    'headers' => array(
-                        'Authorization' => 'Bearer ' . $access_token,
-                        'Cache-Control' => 'no-cache'
-                    ),
-                ));
-                
-                if (is_wp_error($response)) {
-                    echo '<p>Error fetching products: ' . esc_html($response->get_error_message()) . '</p>';
-                    break;
-                }
-
-                $body = json_decode(wp_remote_retrieve_body($response), true);
-                $page_products = $body['products'] ?? [];
-                $total_pages = $body['pagination']['totalPages'] ?? 1;
-                $total_results = $body['pagination']['totalResults'] ?? 0;
-
-                // Filter products
-                $matching_products = array_filter($page_products, function($product) use ($normalized_category) {
-                    $url_parts = explode('/', $product['url']);
-                    if (count($url_parts) < 2) return false;
-                    $category_segment = urldecode($url_parts[1]);
-                    $normalized_product_category = strtolower($category_segment);
-                    $normalized_product_category = preg_replace('/\s*\(.*?\)/', '', $normalized_product_category);
-                    $normalized_product_category = preg_replace('/\s+/', '-', $normalized_product_category);
-                    $normalized_product_category = rtrim($normalized_product_category, '-');
-                    return $normalized_product_category === $normalized_category;
-                });
-
-                $collected_products = array_merge($collected_products, array_values($matching_products));
-                $page_to_fetch++;
-                if ($page_to_fetch >= $total_pages) break;
-            }
-
-            $total_results = count($collected_products);
-            $products = array_slice($collected_products, $current_page * 12, 12);
-            $total_pages = ceil($total_results / 12);
-        } else {
-            // Fetch single page for no category
-            $api_url = $base_api_url . '/products/search?currentPage=' . $current_page . '&fields=DEFAULT&pageSize=12';
-            if (WP_DEBUG) {
-                error_log('ITU Shop: Home page fetching products from ' . $api_url);
-            }
-
-            $access_token = get_transient('itu_access_token');
-            if (false === $access_token) {
-                $token_response = wp_remote_post($token_url, array(
-                    'body' => array(
-                        'grant_type' => 'client_credentials',
-                        'client_id' => $client_id,
-                        'client_secret' => $client_secret,
-                    ),
-                ));
-                
-                if (is_wp_error($token_response)) {
-                    echo '<p>Error fetching token: ' . esc_html($token_response->get_error_message()) . '</p>';
-                } else {
-                    $token_body = json_decode(wp_remote_retrieve_body($token_response), true);
-                    $access_token = $token_body['access_token'] ?? '';
-                    if ($access_token) {
-                        set_transient('itu_access_token', $access_token, $token_body['expires_in'] - 60);
-                    }
-                }
-            }
+        $access_token = get_transient('itu_access_token');
+        if (false === $access_token) {
+            $token_response = wp_remote_post($token_url, array(
+                'body' => array(
+                    'grant_type' => 'client_credentials',
+                    'client_id' => $client_id,
+                    'client_secret' => $client_secret,
+                ),
+            ));
             
-            if (empty($access_token)) {
-                echo '<p>Error: No access token received.</p>';
+            if (is_wp_error($token_response)) {
+                echo '<p>Error fetching token: ' . esc_html($token_response->get_error_message()) . '</p>';
             } else {
-                $response = wp_remote_get($api_url, array(
-                    'headers' => array(
-                        'Authorization' => 'Bearer ' . $access_token,
-                        'Cache-Control' => 'no-cache'
-                    ),
-                ));
-                
-                if (is_wp_error($response)) {
-                    echo '<p>Error fetching products: ' . esc_html($response->get_error_message()) . '</p>';
-                } else {
-                    $body = json_decode(wp_remote_retrieve_body($response), true);
-                    $products = $body['products'] ?? [];
-                    $total_pages = $body['pagination']['totalPages'] ?? 1;
-                    $total_results = $body['pagination']['totalResults'] ?? 0;
+                $token_body = json_decode(wp_remote_retrieve_body($token_response), true);
+                $access_token = $token_body['access_token'] ?? '';
+                if ($access_token) {
+                    set_transient('itu_access_token', $access_token, $token_body['expires_in'] - 60);
+                }
+            }
+        }
+        
+        if (empty($access_token)) {
+            echo '<p>Error: No access token received.</p>';
+        } else {
+            $response = wp_remote_get($api_url, array(
+                'headers' => array(
+                    'Authorization' => 'Bearer ' . $access_token,
+                    'Cache-Control' => 'no-cache'
+                ),
+            ));
+            
+            if (is_wp_error($response)) {
+                echo '<p>Error fetching products: ' . esc_html($response->get_error_message()) . '</p>';
+            } else {
+                $body = json_decode(wp_remote_retrieve_body($response), true);
+                $products = $body['products'] ?? [];
+                $total_pages = $body['pagination']['totalPages'] ?? 1;
+                $total_results = $body['pagination']['totalResults'] ?? count($products);
+
+                if ($category) {
+                    $products = array_filter($products, function($product) use ($normalized_category) {
+                        $url_parts = explode('/', $product['url']);
+                        if (count($url_parts) < 2) return false;
+                        $category_segment = urldecode($url_parts[1]);
+                        $normalized_product_category = strtolower($category_segment);
+                        $normalized_product_category = preg_replace('/\s*\(.*?\)/', '', $normalized_product_category);
+                        $normalized_product_category = preg_replace('/\s+/', '-', $normalized_product_category);
+                        $normalized_product_category = rtrim($normalized_product_category, '-');
+                        return $normalized_product_category === $normalized_category;
+                    });
+                    $products = array_values($products);
+                    $total_results = count($products); // Approximate for current page
                 }
             }
         }
 
         // Display total products message
-        echo '<div class="category-message">' . esc_html($category ? "Showing $total_results products for $category" : "Showing $total_results products") . '</div>';
+        echo '<div class="category-message">' . esc_html($category ? "Showing " . count($products) . " products for $category" : "Showing $total_results products") . '</div>';
 
         // Debug output
         if (WP_DEBUG) {
