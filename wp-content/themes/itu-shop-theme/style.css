@@ -18,6 +18,14 @@
 body {
     font-family: Arial, sans-serif;
     line-height: 1.6;
+    min-height: 100vh; /* Ensure body takes full viewport height */
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1; /* Ensure main takes available space for index.php */
+    min-height: calc(100vh - 80px); /* Adjust for header/nav height (approx 80px) */
 }
 
 header {
@@ -64,20 +72,21 @@ footer {
     background: #f8f8f8;
     padding: 1rem;
     text-align: center;
-    margin-top: 2rem;
+    margin-top: auto; /* Push footer to bottom */
 }
 
 #welcome {
-    margin-top: 50px;
+    padding-top: 50px;
 }
 
 .home-content {
     max-width: 1200px;
     margin: 0 auto;    
     padding: 2rem;
+    flex: 1; /* Ensure content takes available space */
+    min-height: calc(100vh - 80px); /* Adjust for header/nav height */
 }
 
-/* Category Filter */
 ul#category-filter {
     display: flex;
     justify-content: center;
@@ -239,6 +248,40 @@ ul#category-filter li.active {
     color: #666;
 }
 
+.about-content {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: left;
+}
+
+.about-content p {
+    margin-bottom: 1rem;
+    color: #333;
+}
+
+.about-content h2 {
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    color: #4B92DB;
+    font-size: 1.5rem;
+}
+
+.about-content a {
+    color: #4B92DB;
+    text-decoration: none;
+}
+
+.about-content a:hover {
+    text-decoration: underline;
+}
+
+.about-title {
+    text-align: center;
+    color: #333;
+    font-size: 2rem;
+    margin: 2rem auto; /* Center with auto margins */
+}
+
 @media (max-width: 768px) {
     .home-content {
         padding: 1rem;
@@ -262,12 +305,24 @@ ul#category-filter li.active {
         flex-wrap: wrap;
         gap: 0.5rem;
     }
+    
+    .about-content {
+        max-width: 100%;
+    }
+    
+    .about-title {
+        font-size: 1.8rem;
+    }
 }
 
 @media (max-width: 480px) {
     .home-content .product-card {
         flex: 1 1 100% !important;
         max-width: 100%;
+    }
+    
+    .about-title {
+        font-size: 1.5rem;
     }
 }
 
