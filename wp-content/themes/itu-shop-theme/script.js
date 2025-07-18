@@ -104,41 +104,59 @@ document.addEventListener('DOMContentLoaded', function() {
         let links = {};
 
         if (!category) {
-            const apiUrl = `${ituAjax.rest_url}?page=${currentPage}`;
-            console.log('Fetching products from:', apiUrl);
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'GET',
-                    headers: { 'X-WP-Nonce': ituAjax.nonce }
-                });
-                console.log('Products response:', { status: response.status, ok: response.ok });
-                const text = await response.text();
+            let collectedProducts = [];
+            let pageToFetch = 0;
+            totalPages = Infinity;
+
+            while (pageToFetch < 80) {
+                const cacheKey = `${pageToFetch}_all`;
                 let data;
-                try {
-                    data = JSON.parse(text);
-                    console.log('Parsed products data:', data);
-                } catch (e) {
-                    console.error('Parse error:', e, 'Response text:', text.substring(0, 200));
-                    throw new Error('Invalid JSON response');
-                }
-                if (response.ok && data.products) {
-                    filteredProducts = data.products;
-                    totalPages = data.total_pages || 1;
-                    totalProducts = data.product_count || data.products.length;
-                    links = data.links || {
-                        prev: currentPage > 0 ? `${ituAjax.rest_url}?page=${currentPage - 1}` : null,
-                        next: currentPage < totalPages - 1 ? `${ituAjax.rest_url}?page=${currentPage + 1}` : null
-                    };
+
+                if (productCache[cacheKey]) {
+                    console.log(`Using cached products for page ${pageToFetch}, category: none`);
+                    data = productCache[cacheKey];
                 } else {
-                    console.error('Error fetching products:', data.message || 'Unknown error', 'Status:', response.status);
-                    grid.innerHTML = '<p>Error loading products: ' + (data.message || 'Unknown error') + '</p>';
-                    return;
+                    const apiUrl = `${ituAjax.rest_url}?page=${pageToFetch}`;
+                    console.log('Fetching products from:', apiUrl);
+                    try {
+                        const response = await fetch(apiUrl, {
+                            method: 'GET',
+                            headers: { 'X-WP-Nonce': ituAjax.nonce }
+                        });
+                        console.log('Products response:', { status: response.status, ok: response.ok });
+                        const text = await response.text();
+                        try {
+                            data = JSON.parse(text);
+                            console.log('Parsed products data:', data);
+                        } catch (e) {
+                            console.error('Parse error:', e, 'Response text:', text.substring(0, 200));
+                            throw new Error('Invalid JSON response');
+                        }
+                        if (!response.ok || !data.products) {
+                            console.error('Error fetching products:', data.message || 'Unknown error', 'Status:', response.status);
+                            break;
+                        }
+                        productCache[cacheKey] = data;
+                    } catch (error) {
+                        console.error('Products fetch error:', error.message);
+                        break;
+                    }
                 }
-            } catch (error) {
-                console.error('Products fetch error:', error.message);
-                grid.innerHTML = '<p>Error loading products: ' + error.message + '</p>';
-                return;
+
+                collectedProducts.push(...data.products);
+                totalPages = Math.min(totalPages, data.total_pages || Infinity);
+                pageToFetch++;
+                if (pageToFetch >= (data.total_pages || Infinity)) break;
             }
+
+            totalProducts = collectedProducts.length;
+            filteredProducts = collectedProducts.slice(currentPage * 12, (currentPage + 1) * 12);
+            totalPages = Math.ceil(totalProducts / 12);
+            console.log('Pagination debug:', { totalProducts, totalPages, currentPage, filteredProducts: filteredProducts.length });
+            links = {
+                prev: currentPage > 0 ? `${ituAjax.rest_url}?page=${currentPage - 1}` : null,
+                next: (currentPage + 1) < totalPages ? `${ituAjax.rest_url}?page=${currentPage + 1}` : null
+            };
         } else {
             const normalizedCategory = normalizeCategory(category);
             let collectedProducts = [];
@@ -316,5 +334,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (initialCategory) {
         console.log('Initial fetch with category:', initialCategory);
         fetchProducts(0, initialCategory);
+    } else {
+        console.log('Initial fetch for all products');
+        fetchProducts(0, '');
     }
 });
