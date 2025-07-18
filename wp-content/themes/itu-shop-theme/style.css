@@ -210,6 +210,13 @@ ul#category-filter li.active {
     padding: 0.5rem;
 }
 
+.category-message {
+    text-align: center;
+    color: #000000;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+}
+
 .no-results {
     width: 100%;
     text-align: center;
