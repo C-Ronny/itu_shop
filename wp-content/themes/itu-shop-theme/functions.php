@@ -32,8 +32,6 @@ function itu_debug_rest_registration() {
         error_log('ITU Shop: functions.php loaded');
         error_log('ITU Shop: REST endpoint itu/v1/products registered');
         error_log('ITU Shop: REST endpoint itu/v1/categories registered');
-        delete_transient('itu_categories');
-        error_log('ITU Shop: Cleared itu_categories transient');
     }
 }
 add_action('rest_api_init', 'itu_debug_rest_registration');
@@ -51,6 +49,137 @@ add_action('rest_api_init', function() {
         'permission_callback' => '__return_true',
     ));
 });
+
+// Compute and cache category counts
+function itu_get_category_counts() {
+    $counts = get_transient('itu_category_counts');
+    if (false !== $counts) {
+        error_log('ITU Shop: Using cached category counts');
+        return $counts;
+    }
+
+    $counts = ['' => 0]; // '' for All Products
+    $client_id = ITU_API_CLIENT_ID;
+    $client_secret = ITU_API_CLIENT_SECRET;
+    $token_url = 'https://api.cisz6lfhs9-ituintern1-s1-public.model-t.cc.commerce.ondemand.com/authorizationserver/oauth/token';
+    $base_api_url = 'https://api.cisz6lfhs9-ituintern1-s1-public.model-t.cc.commerce.ondemand.com/occ/v2/itu';
+
+    $access_token = get_transient('itu_access_token');
+    if (false === $access_token) {
+        $token_response = wp_remote_post($token_url, array(
+            'body' => array(
+                'grant_type' => 'client_credentials',
+                'client_id' => $client_id,
+                'client_secret' => $client_secret,
+            ),
+        ));
+        
+        if (is_wp_error($token_response)) {
+            error_log('ITU Shop: Error fetching token for counts: ' . $token_response->get_error_message());
+            return $counts;
+        }
+        
+        $token_body = json_decode(wp_remote_retrieve_body($token_response), true);
+        $access_token = $token_body['access_token'] ?? '';
+        if ($access_token) {
+            set_transient('itu_access_token', $access_token, $token_body['expires_in'] - 60);
+            error_log('ITU Shop: Access token cached for counts');
+        }
+    }
+    
+    if (empty($access_token)) {
+        error_log('ITU Shop: No access token for counts');
+        return $counts;
+    }
+
+    // Get categories to initialize counts
+    $categories = get_transient('itu_categories');
+    if (false === $categories) {
+        $api_url = $base_api_url . '/catalogs/ituProductCatalog/Online';
+        $response = wp_remote_get($api_url, array(
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $access_token,
+                'Cache-Control' => 'no-cache'
+            ),
+        ));
+        
+        if (is_wp_error($response)) {
+            error_log('ITU Shop: Error fetching categories for counts: ' . $response->get_error_message());
+            return $counts;
+        }
+        
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        $categories = $body['categories'] ?? [];
+        set_transient('itu_categories', $categories, DAY_IN_SECONDS);
+    }
+
+    foreach ($categories as $category) {
+        if ($category['name'] !== 'Brands' && $category['name'] !== 'Configurations') {
+            $counts[$category['name']] = 0;
+        }
+    }
+
+    // Create a map of normalized category names to original names
+    $category_map = [];
+    foreach ($categories as $cat) {
+        if ($cat['name'] === 'Brands' || $cat['name'] === 'Configurations') {
+            continue;
+        }
+        $name = strtolower($cat['name']);
+        $name = preg_replace('/\s*\(.*?\)/', '', $name);
+        $name = preg_replace('/\s+/', '-', $name);
+        $name = rtrim($name, '-');
+        $category_map[$name] = $cat['name'];
+    }
+
+    // Fetch all products to count by category
+    $page = 0;
+    $total_pages = 1;
+    while ($page < $total_pages) {
+        $api_url = $base_api_url . '/products/search?currentPage=' . $page . '&fields=DEFAULT&pageSize=12';
+        $response = wp_remote_get($api_url, array(
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $access_token,
+                'Cache-Control' => 'no-cache'
+            ),
+        ));
+        
+        if (is_wp_error($response)) {
+            error_log('ITU Shop: Error fetching products for counts: ' . $response->get_error_message());
+            break;
+        }
+        
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        $products = $body['products'] ?? [];
+        $total_pages = $body['pagination']['totalPages'] ?? 1;
+        $counts[''] += count($products); // Total for All Products
+        
+        foreach ($products as $product) {
+            $url_parts = explode('/', $product['url']);
+            if (count($url_parts) < 2) {
+                error_log('ITU Shop: Invalid product URL: ' . $product['url']);
+                continue;
+            }
+            $category_segment = urldecode($url_parts[1]);
+            $normalized_category = strtolower($category_segment);
+            $normalized_category = preg_replace('/\s*\(.*?\)/', '', $normalized_category);
+            $normalized_category = preg_replace('/\s+/', '-', $normalized_category);
+            $normalized_category = rtrim($normalized_category, '-');
+            
+            if (isset($category_map[$normalized_category])) {
+                $category_name = $category_map[$normalized_category];
+                $counts[$category_name]++;
+            } else {
+                error_log('ITU Shop: Unmatched category segment: ' . $category_segment . ' (Normalized: ' . $normalized_category . ')');
+            }
+        }
+        $page++;
+    }
+
+    set_transient('itu_category_counts', $counts, DAY_IN_SECONDS);
+    error_log('ITU Shop: Cached category counts: ' . print_r($counts, true));
+    return $counts;
+}
 
 // REST handler for fetching products
 function itu_fetch_products_rest(WP_REST_Request $request) {
@@ -198,11 +327,21 @@ function itu_fetch_categories_rest(WP_REST_Request $request) {
         set_transient('itu_categories', $categories, DAY_IN_SECONDS);
     }
     
-    return array_map(function($cat) {
+    $counts = itu_get_category_counts();
+    $filtered_categories = array_filter($categories, function($cat) {
+        return $cat['name'] !== 'Brands' && $cat['name'] !== 'Configurations';
+    });
+    
+    // Ensure response is always an array
+    $response = array_values(array_map(function($cat) use ($counts) {
         return array(
             'id' => $cat['id'],
-            'name' => $cat['name']
+            'name' => $cat['name'],
+            'count' => $counts[$cat['name']] ?? 0
         );
-    }, $categories);
+    }, $filtered_categories));
+
+    error_log('ITU Shop: Categories endpoint response: ' . print_r($response, true));
+    return rest_ensure_response($response);
 }
 ?>

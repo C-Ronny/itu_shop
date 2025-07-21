@@ -107,7 +107,7 @@ function wp_initial_constants() {
 
 	// Add define( 'WP_DEBUG_LOG', true ); to enable error logging to wp-content/debug.log.
 	if ( ! defined( 'WP_DEBUG_LOG' ) ) {
-		define( 'WP_DEBUG_LOG', false );
+		define( 'WP_DEBUG_LOG', true );
 	}
 
 	if ( ! defined( 'WP_CACHE' ) ) {
@@ -363,9 +363,9 @@ function wp_ssl_constants() {
 	 * @since 2.6.0
 	 * @deprecated 4.0.0
 	 */
-	if ( defined( 'FORCE_SSL_LOGIN' ) && FORCE_SSL_LOGIN ) {
-		force_ssl_admin( true );
-	}
+	// if ( defined( 'FORCE_SSL_LOGIN' ) && FORCE_SSL_LOGIN ) {
+	// 	force_ssl_admin( true );
+	// }
 }
 
 /**
