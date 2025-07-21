@@ -55,10 +55,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (response.ok && Array.isArray(data)) {
             categoriesData = data;
-            let html = `<li data-category-name="" class="${initialCategory === '' ? 'active' : ''}">All Products${initialCategory === '' ? ` (${data.find(c => c.id === '')?.count || 0})` : ''}</li>`;
+            let html = `<li data-category-name="" class="${initialCategory === '' ? 'active' : ''}">All Products</li>`;
             data.forEach(category => {
                 const normalizedName = normalizeCategoryName(category.name);
-                html += `<li data-category-id="${category.id}" data-category-name="${escapeHtml(category.name)}" class="${category.id === initialCategory ? 'active' : ''}">${escapeHtml(normalizedName)}${category.id === initialCategory ? ` (${category.count || 0})` : ''}</li>`;
+                html += `<li data-category-id="${category.id}" data-category-name="${escapeHtml(category.name)}" class="${category.id === initialCategory ? 'active' : ''}">${escapeHtml(normalizedName)}</li>`;
             });
             categoryFilter.innerHTML = html;
             console.log('Rendered categories:', html);
@@ -82,7 +82,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } else {
             console.error('Error fetching categories:', data.message || 'Unknown error', 'Status:', response.status);
-            // Fetch total count from products endpoint for All Products
             fetch(ituAjax.rest_url + '?page=0', {
                 method: 'GET',
                 headers: { 'X-WP-Nonce': ituAjax.nonce }
@@ -90,19 +89,18 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(resp => resp.json())
             .then(prodData => {
                 const totalCount = prodData.total_results || 0;
-                categoryFilter.innerHTML = `<li data-category-name="" class="active">All Products (${totalCount})</li>`;
+                categoryFilter.innerHTML = `<li data-category-name="" class="active">All Products</li>`;
                 fetchProducts(0, '');
             })
             .catch(err => {
                 console.error('Products fetch error for count:', err.message);
-                categoryFilter.innerHTML = '<li data-category-name="" class="active">All Products</li>';
+                categoryFilter.innerHTML = `<li data-category-name="" class="active">All Products</li>`;
                 fetchProducts(0, '');
             });
         }
     })
     .catch(error => {
         console.error('Categories fetch error:', error.message);
-        // Fetch total count from products endpoint for All Products
         fetch(ituAjax.rest_url + '?page=0', {
             method: 'GET',
             headers: { 'X-WP-Nonce': ituAjax.nonce }
@@ -110,21 +108,21 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(resp => resp.json())
         .then(prodData => {
             const totalCount = prodData.total_results || 0;
-            categoryFilter.innerHTML = `<li data-category-name="" class="active">All Products (${totalCount})</li>`;
+            categoryFilter.innerHTML = `<li data-category-name="" class="active">All Products</li>`;
             fetchProducts(0, '');
         })
         .catch(err => {
             console.error('Products fetch error for count:', err.message);
-            categoryFilter.innerHTML = '<li data-category-name="" class="active">All Products</li>';
+            categoryFilter.innerHTML = `<li data-category-name="" class="active">All Products</li>`;
             fetchProducts(0, '');
         });
     });
 
     function updateCategoryFilter(activeCategory) {
-        let html = `<li data-category-name="" class="${activeCategory === '' ? 'active' : ''}">All Products${activeCategory === '' ? ` (${categoriesData.find(c => c.id === '')?.count || 0})` : ''}</li>`;
+        let html = `<li data-category-name="" class="${activeCategory === '' ? 'active' : ''}">All Products</li>`;
         categoriesData.forEach(category => {
             const normalizedName = normalizeCategoryName(category.name);
-            html += `<li data-category-id="${category.id}" data-category-name="${escapeHtml(category.name)}" class="${category.name === activeCategory ? 'active' : ''}">${escapeHtml(normalizedName)}${category.name === activeCategory ? ` (${category.count || 0})` : ''}</li>`;
+            html += `<li data-category-id="${category.id}" data-category-name="${escapeHtml(category.name)}" class="${category.name === activeCategory ? 'active' : ''}">${escapeHtml(normalizedName)}</li>`;
         });
         categoryFilter.innerHTML = html;
 

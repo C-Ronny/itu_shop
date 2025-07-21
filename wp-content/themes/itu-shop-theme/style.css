@@ -99,7 +99,6 @@ ul#category-filter li {
     cursor: pointer;
     color: #4B92DB;
     font-size: 1rem;
-    white-space: nowrap; /* Prevent category names with counts from wrapping */
 }
 
 ul#category-filter li:hover,
@@ -212,13 +211,6 @@ ul#category-filter li.active {
 
 .pagination-link:hover {
     background: #3a78b0;
-}
-
-.pagination-link.disabled {
-    background: #cccccc;
-    color: #666666;
-    opacity: 0.5;
-    cursor: not-allowed;
 }
 
 .page-info {
