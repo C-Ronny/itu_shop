@@ -5,9 +5,10 @@
 get_header(); ?>
 <div class="home-content">
     <h1 id="welcome">Welcome to ITU Shop</h1>
-    <ul id="category-filter">
-        <li data-category="" class="active">All Products</li>        
-    </ul>
+    <div class="search-container">
+        <input type="text" id="search-input" placeholder="Search by product ID or name" value="<?php echo esc_attr(isset($_GET['query']) ? $_GET['query'] : ''); ?>">
+        <button id="search-button">Search</button>
+    </div>
     <?php
     // Check for API credentials
     if (!defined('ITU_API_CLIENT_ID') || !defined('ITU_API_CLIENT_SECRET')) {
@@ -17,29 +18,15 @@ get_header(); ?>
         $client_secret = ITU_API_CLIENT_SECRET;
         $token_url = 'https://api.cisz6lfhs9-ituintern1-s1-public.model-t.cc.commerce.ondemand.com/authorizationserver/oauth/token';
         $base_api_url = 'https://api.cisz6lfhs9-ituintern1-s1-public.model-t.cc.commerce.ondemand.com/occ/v2/itu';
-        
+
         // Validate $_GET parameters
         $current_page = isset($_GET['page']) && is_numeric($_GET['page']) && $_GET['page'] >= 0 ? intval($_GET['page']) : 0;
-        $category = isset($_GET['category']) ? sanitize_text_field($_GET['category']) : '';
-        
-        // Normalize category for filtering
-        $normalized_category = $category;
-        if ($category) {
-            $normalized_category = strtolower($category);
-            $normalized_category = preg_replace('/\s*\(.*?\)/', '', $normalized_category);
-            $normalized_category = preg_replace('/\s+/', '-', $normalized_category);
-            $normalized_category = rtrim($normalized_category, '-');
-        }
+        $query = isset($_GET['query']) ? sanitize_text_field($_GET['query']) : '';
 
-        // Fetch products for the current page
+        // Fetch products
         $products = [];
         $total_pages = 1;
         $total_results = 0;
-
-        $api_url = $base_api_url . '/products/search?currentPage=' . $current_page . '&fields=DEFAULT&pageSize=12';
-        if (WP_DEBUG) {
-            error_log('ITU Shop: Home page fetching products from ' . $api_url);
-        }
 
         $access_token = get_transient('itu_access_token');
         if (false === $access_token) {
@@ -50,55 +37,99 @@ get_header(); ?>
                     'client_secret' => $client_secret,
                 ),
             ));
-            
+
             if (is_wp_error($token_response)) {
                 echo '<p>Error fetching token: ' . esc_html($token_response->get_error_message()) . '</p>';
+                if (WP_DEBUG) {
+                    error_log('ITU Shop: Error fetching token: ' . $token_response->get_error_message());
+                }
             } else {
                 $token_body = json_decode(wp_remote_retrieve_body($token_response), true);
                 $access_token = $token_body['access_token'] ?? '';
                 if ($access_token) {
                     set_transient('itu_access_token', $access_token, $token_body['expires_in'] - 60);
+                    if (WP_DEBUG) {
+                        error_log('ITU Shop: Access token cached');
+                    }
                 }
             }
         }
-        
+
         if (empty($access_token)) {
             echo '<p>Error: No access token received.</p>';
+            if (WP_DEBUG) {
+                error_log('ITU Shop: No access token received');
+            }
         } else {
-            $response = wp_remote_get($api_url, array(
-                'headers' => array(
-                    'Authorization' => 'Bearer ' . $access_token,
-                    'Cache-Control' => 'no-cache'
-                ),
-            ));
-            
-            if (is_wp_error($response)) {
-                echo '<p>Error fetching products: ' . esc_html($response->get_error_message()) . '</p>';
-            } else {
-                $body = json_decode(wp_remote_retrieve_body($response), true);
-                $products = $body['products'] ?? [];
-                $total_pages = $body['pagination']['totalPages'] ?? 1;
-                $total_results = $body['pagination']['totalResults'] ?? count($products);
+            if ($query && preg_match('/^\d+$/', $query)) {
+                // Fetch single product by ID
+                $api_url = $base_api_url . '/products/' . urlencode($query) . '?fields=DEFAULT';
+                if (WP_DEBUG) {
+                    error_log('ITU Shop: Home page fetching product by ID from ' . $api_url);
+                }
+                $response = wp_remote_get($api_url, array(
+                    'headers' => array(
+                        'Authorization' => 'Bearer ' . $access_token,
+                        'Cache-Control' => 'no-cache'
+                    ),
+                ));
 
-                if ($category) {
-                    $products = array_filter($products, function($product) use ($normalized_category) {
-                        $url_parts = explode('/', $product['url']);
-                        if (count($url_parts) < 2) return false;
-                        $category_segment = urldecode($url_parts[1]);
-                        $normalized_product_category = strtolower($category_segment);
-                        $normalized_product_category = preg_replace('/\s*\(.*?\)/', '', $normalized_product_category);
-                        $normalized_product_category = preg_replace('/\s+/', '-', $normalized_product_category);
-                        $normalized_product_category = rtrim($normalized_product_category, '-');
-                        return $normalized_product_category === $normalized_category;
-                    });
-                    $products = array_values($products);
-                    $total_results = count($products); // Approximate for current page
+                if (is_wp_error($response)) {
+                    echo '<p>Error fetching product: ' . esc_html($response->get_error_message()) . '</p>';
+                    if (WP_DEBUG) {
+                        error_log('ITU Shop: Error fetching product: ' . $response->get_error_message());
+                    }
+                } else {
+                    $body = json_decode(wp_remote_retrieve_body($response), true);
+                    if (isset($body['code'])) {
+                        $products = [$body]; // Wrap single product in array
+                        $total_results = 1;
+                        $total_pages = 1;
+                    } else {
+                        $products = [];
+                        $total_results = 0;
+                        if (WP_DEBUG) {
+                            error_log('ITU Shop: Product not found for code: ' . $query);
+                        }
+                    }
+                }
+            } else {
+                // Fetch up to 12 products for name search or all products
+                $api_url = $base_api_url . '/products/search?currentPage=' . $current_page . '&fields=DEFAULT&pageSize=12';
+                if (WP_DEBUG) {
+                    error_log('ITU Shop: Home page fetching products from ' . $api_url);
+                }
+                $response = wp_remote_get($api_url, array(
+                    'headers' => array(
+                        'Authorization' => 'Bearer ' . $access_token,
+                        'Cache-Control' => 'no-cache'
+                    ),
+                ));
+
+                if (is_wp_error($response)) {
+                    echo '<p>Error fetching products: ' . esc_html($response->get_error_message()) . '</p>';
+                    if (WP_DEBUG) {
+                        error_log('ITU Shop: Error fetching products: ' . $response->get_error_message());
+                    }
+                } else {
+                    $body = json_decode(wp_remote_retrieve_body($response), true);
+                    $products = $body['products'] ?? [];
+                    $total_pages = $body['pagination']['totalPages'] ?? 1;
+                    $total_results = $body['pagination']['totalResults'] ?? count($products);
+
+                    if ($query) {
+                        $products = array_filter($products, function($product) use ($query) {
+                            return stripos($product['name'], $query) !== false;
+                        });
+                        $products = array_values($products);
+                        $total_results = count($products);
+                    }
                 }
             }
         }
 
         // Display total products message
-        echo '<div class="category-message">' . esc_html($category ? "Showing " . count($products) . " products for $category" : "Showing $total_results products") . '</div>';
+        echo '<div class="category-message">' . esc_html($query ? "Showing $total_results products for '$query'" : "Showing $total_results products") . '</div>';
 
         // Debug output
         if (WP_DEBUG) {
@@ -115,7 +146,7 @@ get_header(); ?>
         <div class="product-grid" id="product-grid">
             <?php
             if (empty($products)) {
-                echo '<p>No products available.</p>';
+                echo '<p>No products available' . ($query ? " for '$query'" : '') . '.</p>';
                 if (WP_DEBUG) {
                     echo '<pre class="debug">' . esc_html(print_r($body, true)) . '</pre>';
                 }
@@ -125,12 +156,13 @@ get_header(); ?>
                     $price = $product['price']['value'] ?? '0.00';
                     $currency = $product['price']['currencyIso'] ?? 'CHF';
                     $stock_status = $product['stock']['stockLevelStatus'] ?? 'unknown';
+                    $product_url = $product['url'] ?? '#';
                     echo '<div class="product-card">';
                     echo '<div class="image-placeholder"></div>';
                     echo '<h3>' . esc_html($title) . '</h3>';
                     echo '<p class="price">' . esc_html(number_format($price, 2)) . ' ' . esc_html($currency) . '</p>';
                     echo '<p class="stock-status">Stock: ' . esc_html($stock_status) . '</p>';
-                    echo '<a href="#" class="product-link" data-product-code="' . esc_attr($product['code']) . '">' . esc_html($title) . '</a>';
+                    echo '<a href="' . esc_url($product_url) . '" class="product-link" data-product-code="' . esc_attr($product['code']) . '">' . esc_html($title) . '</a>';
                     echo '</div>';
                 }
             }
@@ -140,13 +172,17 @@ get_header(); ?>
             <?php
             $base_url = remove_query_arg('page');
             if ($current_page > 0) {
-                $prev_url = $category ? add_query_arg(['page' => $current_page - 1, 'category' => $category], $base_url) : add_query_arg('page', $current_page - 1, $base_url);
-                echo '<a href="' . esc_url($prev_url) . '" class="pagination-link" data-page="' . ($current_page - 1) . '" data-category="' . esc_attr($category) . '">Previous</a>';
+                $prev_url = $query ? add_query_arg(['page' => $current_page - 1, 'query' => $query], $base_url) : add_query_arg('page', $current_page - 1, $base_url);
+                echo '<a href="' . esc_url($prev_url) . '" class="pagination-link" data-page="' . ($current_page - 1) . '" data-query="' . esc_attr($query) . '">Previous</a>';
+            } else {
+                echo '<span class="pagination-link disabled">Previous</span>';
             }
             echo '<span class="page-info">Page ' . ($current_page + 1) . ' of ' . $total_pages . '</span>';
             if ($current_page < $total_pages - 1 && $total_pages > 1) {
-                $next_url = $category ? add_query_arg(['page' => $current_page + 1, 'category' => $category], $base_url) : add_query_arg('page', $current_page + 1, $base_url);
-                echo '<a href="' . esc_url($next_url) . '" class="pagination-link" data-page="' . ($current_page + 1) . '" data-category="' . esc_attr($category) . '">Next</a>';
+                $next_url = $query ? add_query_arg(['page' => $current_page + 1, 'query' => $query], $base_url) : add_query_arg('page', $current_page + 1, $base_url);
+                echo '<a href="' . esc_url($next_url) . '" class="pagination-link" data-page="' . ($current_page + 1) . '" data-query="' . esc_attr($query) . '">Next</a>';
+            } else {
+                echo '<span class="pagination-link disabled">Next</span>';
             }
             ?>
         </div>
