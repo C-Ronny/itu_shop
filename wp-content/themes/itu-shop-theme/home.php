@@ -156,13 +156,14 @@ get_header(); ?>
                     $price = $product['price']['value'] ?? '0.00';
                     $currency = $product['price']['currencyIso'] ?? 'CHF';
                     $stock_status = $product['stock']['stockLevelStatus'] ?? 'unknown';
-                    $product_url = $product['url'] ?? '#';
+                    $product_code = $product['code'] ?? '';
+                    $product_url = home_url('/product/' . $product_code);
                     echo '<div class="product-card">';
                     echo '<div class="image-placeholder"></div>';
                     echo '<h3>' . esc_html($title) . '</h3>';
                     echo '<p class="price">' . esc_html(number_format($price, 2)) . ' ' . esc_html($currency) . '</p>';
                     echo '<p class="stock-status">Stock: ' . esc_html($stock_status) . '</p>';
-                    echo '<a href="' . esc_url($product_url) . '" class="product-link" data-product-code="' . esc_attr($product['code']) . '">' . esc_html($title) . '</a>';
+                    echo '<a href="' . esc_url($product_url) . '" class="product-link" data-product-code="' . esc_attr($product_code) . '">' . esc_html($title) . '</a>';
                     echo '</div>';
                 }
             }

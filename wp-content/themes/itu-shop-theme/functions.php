@@ -20,7 +20,8 @@ function itu_shop_theme_scripts() {
     wp_enqueue_script('itu-shop-theme-script', get_template_directory_uri() . '/script.js', array(), '1.1', true);
     wp_localize_script('itu-shop-theme-script', 'ituAjax', array(
         'rest_url' => rest_url('itu/v1/products'),
-        'nonce' => wp_create_nonce('wp_rest')
+        'nonce' => wp_create_nonce('wp_rest'),
+        'home_url' => home_url('/')
     ));
 }
 add_action('wp_enqueue_scripts', 'itu_shop_theme_scripts');

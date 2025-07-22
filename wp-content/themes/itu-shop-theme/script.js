@@ -9,12 +9,12 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    if (!ituAjax || !ituAjax.rest_url || !ituAjax.nonce) {
+    if (!ituAjax || !ituAjax.rest_url || !ituAjax.nonce || !ituAjax.home_url) {
         console.error('ituAjax not properly initialized:', { ituAjax });
         grid.innerHTML = '<p>Error: Script initialization failed</p>';
         return;
     }
-    console.log('ituAjax:', { rest_url: ituAjax.rest_url, nonce: ituAjax.nonce });
+    console.log('ituAjax:', { rest_url: ituAjax.rest_url, nonce: ituAjax.nonce, home_url: ituAjax.home_url });
 
     const urlParams = new URLSearchParams(window.location.search);
     const initialQuery = urlParams.get('query') || '';
@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const currency = product.price?.currencyIso || 'CHF';
             const stockStatus = product.stock?.stockLevelStatus || 'unknown';
             const productCode = product.code || '';
-            const productUrl = product.url || '#';
+            const productUrl = `${ituAjax.home_url}product/${encodeURIComponent(productCode)}`;
 
             html += `
                 <div class="product-card">
