@@ -7,6 +7,7 @@ get_header(); ?>
     <div class="back-arrow">
         <a href="<?php echo esc_url(home_url('/')); ?>" title="Back to Home">← Back</a>
     </div>
+    <div class="cart-notification" style="display: none;" role="alert">Product added to cart!</div>
     <?php
     $product_code = get_query_var('product_code', '');
     if (empty($product_code)) {
@@ -126,13 +127,16 @@ get_header(); ?>
                                 <p class="product-stock">Stock: <?php echo esc_html($stock_status); ?></p>
                                 <p class="product-manufacturer">Manufacturer: <?php echo esc_html($manufacturer); ?></p>
                                 <div class="product-actions">
-                                    <div class="quantity-selector">
-                                        <label for="quantity">Quantity:</label>
-                                        <button type="button" class="quantity-button" id="decrease-quantity" aria-label="Decrease quantity">-</button>
-                                        <input  id="quantity" name="quantity" value="1" min="1" max="10" aria-label="Quantity" data-price="<?php echo esc_attr($price_value); ?>">
-                                        <button type="button" class="quantity-button" id="increase-quantity" aria-label="Increase quantity">+</button>
-                                    </div>                                    
-                                    <p class="max-quantity">Maximum Order Quantity: 10</p>
+                                    <form id="add-to-cart-form" method="post" action="">
+                                        <input type="hidden" name="product_code" value="<?php echo esc_attr($code); ?>">
+                                        <div class="quantity-selector">
+                                            <label for="quantity">Quantity:</label>
+                                            <button type="button" class="quantity-button" id="decrease-quantity" aria-label="Decrease quantity">-</button>
+                                            <input id="quantity" name="quantity" value="1" min="1" max="10" aria-label="Quantity" data-price="<?php echo esc_attr($price_value); ?>">
+                                            <button type="button" class="quantity-button" id="increase-quantity" aria-label="Increase quantity">+</button>
+                                        </div>
+                                        <button type="submit" class="add-to-cart" id="add-to-cart">Add to Cart</button>
+                                    </form>
                                     <p class="total-price">Total: <span id="total-price">CHF <?php echo esc_html(number_format($price_value, 2)); ?></span></p>
                                 </div>
                             </div>

@@ -1,4 +1,9 @@
 <?php
+// Start session for cart
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // Register Navigation Menu
 function itu_shop_theme_setup() {
     register_nav_menus(
@@ -27,8 +32,27 @@ function itu_shop_theme_scripts() {
     }
     if (get_query_var('itu_product') && get_query_var('product_code')) {
         wp_enqueue_script('itu-shop-product-script', get_template_directory_uri() . '/script-product.js', array(), '1.1', true);
+        wp_enqueue_script('itu-shop-cart-script', get_template_directory_uri() . '/script-cart.js', array(), '1.1', true);
+        wp_localize_script('itu-shop-cart-script', 'ituAjax', array(
+            'rest_url_cart_add' => rest_url('itu/v1/cart/add'),
+            'rest_url_cart_update' => rest_url('itu/v1/cart/update'),
+            'rest_url_cart_remove' => rest_url('itu/v1/cart/remove'),
+            'nonce' => wp_create_nonce('wp_rest')
+        ));
         if (WP_DEBUG) {
-            error_log('ITU Shop: Enqueued script-product.js for product page');
+            error_log('ITU Shop: Enqueued script-product.js and script-cart.js for product page');
+        }
+    }
+    if (is_page_template('cart.php')) {
+        wp_enqueue_script('itu-shop-cart-script', get_template_directory_uri() . '/script-cart.js', array(), '1.1', true);
+        wp_localize_script('itu-shop-cart-script', 'ituAjax', array(
+            'rest_url_cart_add' => rest_url('itu/v1/cart/add'),
+            'rest_url_cart_update' => rest_url('itu/v1/cart/update'),
+            'rest_url_cart_remove' => rest_url('itu/v1/cart/remove'),
+            'nonce' => wp_create_nonce('wp_rest')
+        ));
+        if (WP_DEBUG) {
+            error_log('ITU Shop: Enqueued script-cart.js for cart page');
         }
     }
 }
@@ -38,19 +62,77 @@ add_action('wp_enqueue_scripts', 'itu_shop_theme_scripts');
 function itu_debug_rest_registration() {
     if (WP_DEBUG) {
         error_log('ITU Shop: functions.php loaded');
-        error_log('ITU Shop: REST endpoint itu/v1/products registered');
+        error_log('ITU Shop: REST endpoints registered: products, cart/add, cart/update, cart/remove');
     }
 }
 add_action('rest_api_init', 'itu_debug_rest_registration');
 
 // Register REST endpoints
 add_action('rest_api_init', function() {
+    // Products endpoint
     register_rest_route('itu/v1', '/products(?:/(?P<productCode>[^/]+))?', array(
         'methods' => 'GET',
         'callback' => 'itu_fetch_products_rest',
         'permission_callback' => '__return_true',
         'args' => array(
             'productCode' => array(
+                'validate_callback' => function($param) {
+                    return is_string($param) && !empty($param);
+                }
+            ),
+        ),
+    ));
+
+    // Add to cart endpoint
+    register_rest_route('itu/v1', '/cart/add', array(
+        'methods' => 'POST',
+        'callback' => 'itu_add_to_cart_rest',
+        'permission_callback' => '__return_true',
+        'args' => array(
+            'product_code' => array(
+                'required' => true,
+                'validate_callback' => function($param) {
+                    return is_string($param) && !empty($param);
+                }
+            ),
+            'quantity' => array(
+                'required' => true,
+                'validate_callback' => function($param) {
+                    return is_numeric($param) && $param >= 1 && $param <= 10;
+                }
+            ),
+        ),
+    ));
+
+    // Update cart quantity endpoint
+    register_rest_route('itu/v1', '/cart/update', array(
+        'methods' => 'POST',
+        'callback' => 'itu_update_cart_quantity_rest',
+        'permission_callback' => '__return_true',
+        'args' => array(
+            'product_code' => array(
+                'required' => true,
+                'validate_callback' => function($param) {
+                    return is_string($param) && !empty($param);
+                }
+            ),
+            'quantity' => array(
+                'required' => true,
+                'validate_callback' => function($param) {
+                    return is_numeric($param) && $param >= 1 && $param <= 10;
+                }
+            ),
+        ),
+    ));
+
+    // Remove from cart endpoint
+    register_rest_route('itu/v1', '/cart/remove', array(
+        'methods' => 'POST',
+        'callback' => 'itu_remove_from_cart_rest',
+        'permission_callback' => '__return_true',
+        'args' => array(
+            'product_code' => array(
+                'required' => true,
                 'validate_callback' => function($param) {
                     return is_string($param) && !empty($param);
                 }
@@ -168,15 +250,125 @@ function itu_fetch_products_rest(WP_REST_Request $request) {
     }
 }
 
-// Add rewrite rules for product pages
+// Add to cart REST handler
+function itu_add_to_cart_rest(WP_REST_Request $request) {
+    $nonce = $request->get_header('X-WP-Nonce');
+    if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
+        error_log('ITU Shop: Add to cart nonce verification failed');
+        return new WP_Error('rest_forbidden', 'Nonce verification failed', array('status' => 403));
+    }
+
+    $product_code = sanitize_text_field($request->get_param('product_code'));
+    $quantity = intval($request->get_param('quantity'));
+
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    if (!isset($_SESSION['itu_cart'])) {
+        $_SESSION['itu_cart'] = array();
+    }
+
+    if (isset($_SESSION['itu_cart'][$product_code])) {
+        $_SESSION['itu_cart'][$product_code] += $quantity;
+        if ($_SESSION['itu_cart'][$product_code] > 10) {
+            $_SESSION['itu_cart'][$product_code] = 10;
+        }
+    } else {
+        $_SESSION['itu_cart'][$product_code] = $quantity;
+    }
+
+    if (WP_DEBUG) {
+        error_log('ITU Shop: Added to cart - Product: ' . $product_code . ', Quantity: ' . $quantity);
+    }
+
+    return array(
+        'success' => true,
+        'message' => 'Product added to cart',
+        'cart' => $_SESSION['itu_cart']
+    );
+}
+
+// Update cart quantity REST handler
+function itu_update_cart_quantity_rest(WP_REST_Request $request) {
+    $nonce = $request->get_header('X-WP-Nonce');
+    if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
+        error_log('ITU Shop: Update cart quantity nonce verification failed');
+        return new WP_Error('rest_forbidden', 'Nonce verification failed', array('status' => 403));
+    }
+
+    $product_code = sanitize_text_field($request->get_param('product_code'));
+    $quantity = intval($request->get_param('quantity'));
+
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    if (!isset($_SESSION['itu_cart']) || !isset($_SESSION['itu_cart'][$product_code])) {
+        error_log('ITU Shop: Product not in cart: ' . $product_code);
+        return new WP_Error('rest_not_found', 'Product not in cart', array('status' => 404));
+    }
+
+    $_SESSION['itu_cart'][$product_code] = $quantity;
+
+    if (WP_DEBUG) {
+        error_log('ITU Shop: Updated cart - Product: ' . $product_code . ', New Quantity: ' . $quantity);
+    }
+
+    return array(
+        'success' => true,
+        'message' => 'Cart quantity updated',
+        'cart' => $_SESSION['itu_cart']
+    );
+}
+
+// Remove from cart REST handler
+function itu_remove_from_cart_rest(WP_REST_Request $request) {
+    $nonce = $request->get_header('X-WP-Nonce');
+    if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
+        error_log('ITU Shop: Remove from cart nonce verification failed');
+        return new WP_Error('rest_forbidden', 'Nonce verification failed', array('status' => 403));
+    }
+
+    $product_code = sanitize_text_field($request->get_param('product_code'));
+
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    if (!isset($_SESSION['itu_cart']) || !isset($_SESSION['itu_cart'][$product_code])) {
+        error_log('ITU Shop: Product not in cart: ' . $product_code);
+        return new WP_Error('rest_not_found', 'Product not in cart', array('status' => 404));
+    }
+
+    unset($_SESSION['itu_cart'][$product_code]);
+
+    if (WP_DEBUG) {
+        error_log('ITU Shop: Removed from cart - Product: ' . $product_code);
+    }
+
+    return array(
+        'success' => true,
+        'message' => 'Product removed from cart',
+        'cart' => $_SESSION['itu_cart']
+    );
+}
+
+// Add rewrite rules for product and cart pages
 function itu_shop_rewrite_rules() {
     add_rewrite_rule(
         '^product/([^/]+)/?$',
         'index.php?itu_product=1&product_code=$matches[1]',
         'top'
     );
+    add_rewrite_rule(
+        '^cart/?$',
+        'index.php?itu_cart=1',
+        'top'
+    );
     if (WP_DEBUG) {
-        error_log('ITU Shop: Rewrite rule added for product pages: product/([^/]+)/? -> index.php?itu_product=1&product_code=$matches[1]');
+        error_log('ITU Shop: Rewrite rules added for product pages: product/([^/]+)/? -> index.php?itu_product=1&product_code=$matches[1]');
+        error_log('ITU Shop: Rewrite rule added for cart page: cart/? -> index.php?itu_cart=1');
     }
 }
 add_action('init', 'itu_shop_rewrite_rules');
@@ -185,11 +377,12 @@ add_action('init', 'itu_shop_rewrite_rules');
 function itu_shop_query_vars($query_vars) {
     $query_vars[] = 'itu_product';
     $query_vars[] = 'product_code';
+    $query_vars[] = 'itu_cart';
     return $query_vars;
 }
 add_filter('query_vars', 'itu_shop_query_vars');
 
-// Load product template
+// Load templates
 function itu_shop_template_include($template) {
     if (get_query_var('itu_product') && get_query_var('product_code')) {
         $new_template = locate_template('single-product.php');
@@ -201,6 +394,19 @@ function itu_shop_template_include($template) {
         } else {
             if (WP_DEBUG) {
                 error_log('ITU Shop: single-product.php template not found');
+            }
+        }
+    }
+    if (get_query_var('itu_cart')) {
+        $new_template = locate_template('cart.php');
+        if ($new_template) {
+            if (WP_DEBUG) {
+                error_log('ITU Shop: Loading cart.php');
+            }
+            return $new_template;
+        } else {
+            if (WP_DEBUG) {
+                error_log('ITU Shop: cart.php template not found');
             }
         }
     }
