@@ -4,10 +4,13 @@
  */
 get_header(); ?>
 <div class="product-details">
+    <div class="back-arrow">
+        <a href="<?php echo esc_url(home_url('/')); ?>" title="Back to Home">&#8592; Back</a>
+    </div>
     <?php
     $product_code = get_query_var('product_code', '');
     if (empty($product_code)) {
-        echo '<p>Error: No product code specified.</p>';
+        echo '<div class="error-message">Error: No product code specified.</div>';
         if (WP_DEBUG) {
             error_log('ITU Shop: No product code specified for single-product.php');
         }
@@ -19,7 +22,7 @@ get_header(); ?>
         $image_base_url = 'https://api.cisz6lfhs9-ituintern1-s1-public.model-t.cc.commerce.ondemand.com';
 
         if (empty($client_id) || empty($client_secret)) {
-            echo '<p>Error: API credentials not configured in wp-config.php</p>';
+            echo '<div class="error-message">Error: API credentials not configured in wp-config.php</div>';
             if (WP_DEBUG) {
                 error_log('ITU Shop: API credentials not configured in wp-config.php');
             }
@@ -35,7 +38,7 @@ get_header(); ?>
                 ));
 
                 if (is_wp_error($token_response)) {
-                    echo '<p>Error fetching token: ' . esc_html($token_response->get_error_message()) . '</p>';
+                    echo '<div class="error-message">Error fetching token: ' . esc_html($token_response->get_error_message()) . '</div>';
                     if (WP_DEBUG) {
                         error_log('ITU Shop: Error fetching token: ' . $token_response->get_error_message());
                     }
@@ -52,7 +55,7 @@ get_header(); ?>
             }
 
             if (empty($access_token)) {
-                echo '<p>Error: No access token received.</p>';
+                echo '<div class="error-message">Error: No access token received.</div>';
                 if (WP_DEBUG) {
                     error_log('ITU Shop: No access token received');
                 }
@@ -69,7 +72,7 @@ get_header(); ?>
                 ));
 
                 if (is_wp_error($response)) {
-                    echo '<p>Error fetching product: ' . esc_html($response->get_error_message()) . '</p>';
+                    echo '<div class="error-message">Error fetching product: ' . esc_html($response->get_error_message()) . '</div>';
                     if (WP_DEBUG) {
                         error_log('ITU Shop: Error fetching product: ' . $response->get_error_message());
                     }
@@ -79,7 +82,7 @@ get_header(); ?>
                         error_log('ITU Shop: Product API response: ' . json_encode($product));
                     }
                     if (!isset($product['code'])) {
-                        echo '<p>Product not found.</p>';
+                        echo '<div class="error-message">Product not found.</div>';
                         if (WP_DEBUG) {
                             error_log('ITU Shop: Product not found for code: ' . $product_code);
                         }
