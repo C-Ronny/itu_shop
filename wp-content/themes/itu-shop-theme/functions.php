@@ -25,6 +25,12 @@ function itu_shop_theme_scripts() {
             'home_url' => home_url('/')
         ));
     }
+    if (get_query_var('itu_product') && get_query_var('product_code')) {
+        wp_enqueue_script('itu-shop-product-script', get_template_directory_uri() . '/script-product.js', array(), '1.1', true);
+        if (WP_DEBUG) {
+            error_log('ITU Shop: Enqueued script-product.js for product page');
+        }
+    }
 }
 add_action('wp_enqueue_scripts', 'itu_shop_theme_scripts');
 

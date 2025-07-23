@@ -5,7 +5,7 @@
 get_header(); ?>
 <div class="product-details">
     <div class="back-arrow">
-        <a href="<?php echo esc_url(home_url('/')); ?>" title="Back to Home">&#8592; Back</a>
+        <a href="<?php echo esc_url(home_url('/')); ?>" title="Back to Home">← Back</a>
     </div>
     <?php
     $product_code = get_query_var('product_code', '');
@@ -90,6 +90,7 @@ get_header(); ?>
                         $name = $product['name'] ?? 'Unnamed Product';
                         $code = $product['code'] ?? $product_code;
                         $price = $product['price']['formattedValue'] ?? 'CHF 0.00';
+                        $price_value = $product['price']['value'] ?? 0.00;
                         $description = $product['description'] ?? 'No description available';
                         $stock_status = $product['stock']['stockLevelStatus'] ?? 'No stock information';
                         $category = !empty($product['categories']) ? ($product['categories'][0]['name'] ?? 'No category') : 'No category';
@@ -105,6 +106,7 @@ get_header(); ?>
                         }
                         if (WP_DEBUG) {
                             error_log('ITU Shop: Image URL: ' . ($image_url ?: 'None'));
+                            error_log('ITU Shop: Product price value: ' . $price_value);
                         }
                         ?>
                         <div class="product-details-container">
@@ -123,9 +125,15 @@ get_header(); ?>
                                 <p class="product-price"><?php echo esc_html($price); ?></p>
                                 <p class="product-stock">Stock: <?php echo esc_html($stock_status); ?></p>
                                 <p class="product-manufacturer">Manufacturer: <?php echo esc_html($manufacturer); ?></p>
-                                <!-- Placeholder for quantity selector and Add to Cart button -->
                                 <div class="product-actions">
-                                    <p>Quantity selector and Add to Cart coming soon.</p>
+                                    <div class="quantity-selector">
+                                        <label for="quantity">Quantity:</label>
+                                        <button type="button" class="quantity-button" id="decrease-quantity" aria-label="Decrease quantity">-</button>
+                                        <input type="number" id="quantity" name="quantity" value="1" min="1" max="10" aria-label="Quantity" data-price="<?php echo esc_attr($price_value); ?>">
+                                        <button type="button" class="quantity-button" id="increase-quantity" aria-label="Increase quantity">+</button>
+                                    </div>                                    
+                                    <p class="max-quantity">Maximum Order Quantity: 10</p>
+                                    <p class="total-price">Total: <span id="total-price">CHF <?php echo esc_html(number_format($price_value, 2)); ?></span></p>
                                 </div>
                             </div>
                         </div>
