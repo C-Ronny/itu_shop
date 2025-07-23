@@ -129,7 +129,7 @@ get_header(); ?>
                                     <div class="quantity-selector">
                                         <label for="quantity">Quantity:</label>
                                         <button type="button" class="quantity-button" id="decrease-quantity" aria-label="Decrease quantity">-</button>
-                                        <input type="number" id="quantity" name="quantity" value="1" min="1" max="10" aria-label="Quantity" data-price="<?php echo esc_attr($price_value); ?>">
+                                        <input  id="quantity" name="quantity" value="1" min="1" max="10" aria-label="Quantity" data-price="<?php echo esc_attr($price_value); ?>">
                                         <button type="button" class="quantity-button" id="increase-quantity" aria-label="Increase quantity">+</button>
                                     </div>                                    
                                     <p class="max-quantity">Maximum Order Quantity: 10</p>
