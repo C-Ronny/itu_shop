@@ -365,11 +365,11 @@ footer {
 
 .back-arrow {
     margin: 1rem;
-    font-size: 1.2rem;
+    font-size: 1rem;
 }
 
 .back-arrow a {
-    color: #4B92DB;
+    color: #000000;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
@@ -377,7 +377,7 @@ footer {
 }
 
 .back-arrow a:hover {
-    text-decoration: underline;
+    color:#4B92DB;    
 }
 
 .error-message {
