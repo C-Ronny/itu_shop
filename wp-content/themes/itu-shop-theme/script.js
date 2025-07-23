@@ -1,4 +1,10 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // Exit early if not on the homepage
+    if (!document.querySelector('.home-content')) {
+        console.log('ITU Shop: script.js skipped on non-homepage');
+        return;
+    }
+
     const grid = document.getElementById('product-grid');
     const searchInput = document.getElementById('search-input');
     const searchButton = document.getElementById('search-button');
@@ -14,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
         grid.innerHTML = '<p>Error: Script initialization failed</p>';
         return;
     }
-    console.log('ituAjax:', { rest_url: ituAjax.rest_url, nonce: ituAjax.nonce, home_url: ituAjax.home_url });
+    console.log('ituAjax:', { rest_url: ituAjax.rest_url, nonce: iuAjax.nonce, home_url: ituAjax.home_url });
 
     const urlParams = new URLSearchParams(window.location.search);
     const initialQuery = urlParams.get('query') || '';
@@ -239,6 +245,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             url.searchParams.set(param, encodeURIComponent(param));
         }
-        return url.toString();
+        return url.toString;
     }
 });

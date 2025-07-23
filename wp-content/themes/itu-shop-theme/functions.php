@@ -17,12 +17,14 @@ add_action('wp_enqueue_scripts', 'itu_shop_theme_styles');
 
 // Enqueue Scripts and Localize
 function itu_shop_theme_scripts() {
-    wp_enqueue_script('itu-shop-theme-script', get_template_directory_uri() . '/script.js', array(), '1.1', true);
-    wp_localize_script('itu-shop-theme-script', 'ituAjax', array(
-        'rest_url' => rest_url('itu/v1/products'),
-        'nonce' => wp_create_nonce('wp_rest'),
-        'home_url' => home_url('/')
-    ));
+    if (is_page_template('home.php')) {
+        wp_enqueue_script('itu-shop-theme-script', get_template_directory_uri() . '/script.js', array(), '1.1', true);
+        wp_localize_script('itu-shop-theme-script', 'ituAjax', array(
+            'rest_url' => rest_url('itu/v1/products'),
+            'nonce' => wp_create_nonce('wp_rest'),
+            'home_url' => home_url('/')
+        ));
+    }
 }
 add_action('wp_enqueue_scripts', 'itu_shop_theme_scripts');
 
@@ -159,4 +161,58 @@ function itu_fetch_products_rest(WP_REST_Request $request) {
         );
     }
 }
+
+// Add rewrite rules for product pages
+function itu_shop_rewrite_rules() {
+    add_rewrite_rule(
+        '^product/([^/]+)/?$',
+        'index.php?itu_product=1&product_code=$matches[1]',
+        'top'
+    );
+    if (WP_DEBUG) {
+        error_log('ITU Shop: Rewrite rule added for product pages: product/([^/]+)/? -> index.php?itu_product=1&product_code=$matches[1]');
+    }
+}
+add_action('init', 'itu_shop_rewrite_rules');
+
+// Register query vars
+function itu_shop_query_vars($query_vars) {
+    $query_vars[] = 'itu_product';
+    $query_vars[] = 'product_code';
+    return $query_vars;
+}
+add_filter('query_vars', 'itu_shop_query_vars');
+
+// Load product template
+function itu_shop_template_include($template) {
+    if (get_query_var('itu_product') && get_query_var('product_code')) {
+        $new_template = locate_template('single-product.php');
+        if ($new_template) {
+            if (WP_DEBUG) {
+                error_log('ITU Shop: Loading single-product.php for product_code: ' . get_query_var('product_code'));
+            }
+            return $new_template;
+        } else {
+            if (WP_DEBUG) {
+                error_log('ITU Shop: single-product.php template not found');
+            }
+        }
+    }
+    return $template;
+}
+add_filter('template_include', 'itu_shop_template_include');
+
+// Flush rewrite rules on theme activation or if not flushed
+function itu_shop_flush_rewrite_rules() {
+    if (get_transient('itu_shop_rewrite_flushed') !== '1') {
+        itu_shop_rewrite_rules();
+        flush_rewrite_rules();
+        set_transient('itu_shop_rewrite_flushed', '1', WEEK_IN_SECONDS);
+        if (WP_DEBUG) {
+            error_log('ITU Shop: Rewrite rules flushed');
+        }
+    }
+}
+add_action('after_switch_theme', 'itu_shop_flush_rewrite_rules');
+add_action('init', 'itu_shop_flush_rewrite_rules');
 ?>
