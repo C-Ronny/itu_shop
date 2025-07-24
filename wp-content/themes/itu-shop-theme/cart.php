@@ -24,115 +24,87 @@ get_header(); ?>
         $base_api_url = 'https://api.cisz6lfhs9-ituintern1-s1-public.model-t.cc.commerce.ondemand.com/occ/v2/itu';
 
         if (empty($client_id) || empty($client_secret)) {
-            echo '<div class="error-message">Error: API credentials not configured in wp-config.php</div>';
-            if (WP_DEBUG) {
-                error_log('ITU Shop: API credentials not configured in wp-config.php');
-            }
+            echo '<p>Error: API credentials not configured in wp-config.php</p>';
         } else {
-            $access_token = get_transient('itu_access_token');
-            if (false === $access_token) {
-                $token_response = wp_remote_post($token_url, array(
-                    'body' => array(
-                        'grant_type' => 'client_credentials',
-                        'client_id' => $client_id,
-                        'client_secret' => $client_secret,
-                    ),
-                ));
+            // Fetch product details for items in cart
+            $access_token = itu_get_access_token(); // Re-use the existing token function
+            $cart_items_details = [];
+            $cart_total = 0;
 
-                if (is_wp_error($token_response)) {
-                    echo '<div class="error-message">Error fetching token: ' . esc_html($token_response->get_error_message()) . '</div>';
-                    if (WP_DEBUG) {
-                        error_log('ITU Shop: Error fetching token: ' . $token_response->get_error_message());
-                    }
-                } else {
-                    $token_body = json_decode(wp_remote_retrieve_body($token_response), true);
-                    $access_token = $token_body['access_token'] ?? '';
-                    if ($access_token) {
-                        set_transient('itu_access_token', $access_token, $token_body['expires_in'] - 60);
-                        if (WP_DEBUG) {
-                            error_log('ITU Shop: Access token cached');
-                        }
-                    }
-                }
-            }
-
-            if (empty($access_token)) {
-                echo '<div class="error-message">Error: No access token received.</div>';
-                if (WP_DEBUG) {
-                    error_log('ITU Shop: No access token received');
-                }
-            } else {
-                $cart_items = array();
-                $cart_total = 0;
+            if ($access_token) {
                 foreach ($cart as $product_code => $quantity) {
-                    $api_url = $base_api_url . '/products/' . urlencode($product_code) . '?fields=DEFAULT';
-                    if (WP_DEBUG) {
-                        error_log('ITU Shop: Fetching cart product from ' . $api_url);
-                    }
-                    $response = wp_remote_get($api_url, array(
-                        'headers' => array(
-                            'Authorization' => 'Bearer ' . $access_token,
-                            'Cache-Control' => 'no-cache'
-                        ),
-                    ));
+                    $api_url = $base_api_url . '/products/' . urlencode($product_code);
+                    $response = wp_remote_get($api_url, [
+                        'headers' => ['Authorization' => 'Bearer ' . $access_token],
+                        'timeout' => 15,
+                    ]);
 
-                    if (is_wp_error($response)) {
-                        if (WP_DEBUG) {
-                            error_log('ITU Shop: Error fetching cart product: ' . $response->get_error_message());
+                    if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
+                        $product_data = json_decode(wp_remote_retrieve_body($response), true);
+                        if ($product_data) {
+                            $price_value = $product_data['price']['value'] ?? 0;
+                            $formatted_price = $product_data['price']['formattedValue'] ?? 'N/A';
+                            $item_total = $price_value * $quantity;
+                            $cart_total += $item_total;
+
+                            $cart_items_details[] = [
+                                'code' => $product_data['code'],
+                                'name' => $product_data['name'],
+                                'quantity' => $quantity,
+                                'price_value' => $price_value,
+                                'formatted_price' => $formatted_price,
+                                'total' => $item_total,
+                                'image_url' => $product_data['images'][0]['url'] ?? ''
+                            ];
+                        } else {
+                            // Log missing product or error, consider removing from cart if product not found
+                            error_log('ITU Shop: Product not found in API for cart: ' . $product_code);
+                            // Optionally, remove the invalid product from session here
+                            // unset($_SESSION['itu_cart'][$product_code]);
                         }
-                        continue;
+                    } else {
+                        error_log('ITU Shop: Error fetching product ' . $product_code . ' from API: ' . (is_wp_error($response) ? $response->get_error_message() : wp_remote_retrieve_response_message($response)));
                     }
-
-                    $product = json_decode(wp_remote_retrieve_body($response), true);
-                    if (!isset($product['code'])) {
-                        if (WP_DEBUG) {
-                            error_log('ITU Shop: Cart product not found for code: ' . $product_code);
-                        }
-                        continue;
-                    }
-
-                    $cart_items[] = array(
-                        'code' => $product['code'],
-                        'name' => $product['name'] ?? 'Unnamed Product',
-                        'price' => $product['price']['value'] ?? 0.00,
-                        'formatted_price' => $product['price']['formattedValue'] ?? 'CHF 0.00',
-                        'quantity' => $quantity,
-                        'total' => ($product['price']['value'] ?? 0.00) * $quantity
-                    );
-                    $cart_total += ($product['price']['value'] ?? 0.00) * $quantity;
                 }
 
-                if (empty($cart_items)) {
+                if (empty($cart_items_details)) {
                     echo '<div class="empty-cart">Your cart is empty. <a href="' . esc_url(home_url('/')) . '">Continue shopping</a>.</div>';
+                    // Clear the session cart if no items were successfully fetched (optional, depends on desired behavior)
+                    // unset($_SESSION['itu_cart']);
                 } else {
                     ?>
-                    <table class="cart-table">
-                        <thead>
+                    <div class="cart-notification" style="display:none;"></div>
+                    <table class="cart-table"> <thead>
                             <tr>
                                 <th>Product</th>
                                 <th>Quantity</th>
                                 <th>Price</th>
                                 <th>Total</th>
-                                <th>Remove</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($cart_items as $item): ?>
-                                <tr data-product-code="<?php echo esc_attr($item['code']); ?>">
-                                    <td><?php echo esc_html($item['name']); ?></td>
-                                    <td>
+                            <?php foreach ($cart_items_details as $item) : ?>
+                                <tr>
+                                    <td class="product-info" data-label="Product">
+                                        <?php if (!empty($item['image_url'])) : ?>
+                                            <img src="<?php echo esc_url($item['image_url']); ?>" alt="<?php echo esc_attr($item['name']); ?>" class="cart-product-image">
+                                        <?php endif; ?>
+                                        <a href="<?php echo esc_url(home_url('/product/' . $item['code'])); ?>"><?php echo esc_html($item['name']); ?></a>
+                                    </td>
+                                    <td data-label="Quantity">
                                         <form class="update-quantity-form" method="post" action="">
                                             <input type="hidden" name="product_code" value="<?php echo esc_attr($item['code']); ?>">
                                             <div class="quantity-selector">
-                                                <button type="button" class="quantity-button update-quantity-decrease" aria-label="Decrease quantity">-</button>
-                                                <input type="number" class="quantity-input" name="quantity" value="<?php echo esc_attr($item['quantity']); ?>" min="1" max="10" aria-label="Quantity">
-                                                <button type="button" class="quantity-button update-quantity-increase" aria-label="Increase quantity">+</button>
+                                                <button type="button" class="update-quantity-decrease">-</button>
+                                                <input type="number" name="quantity" class="quantity-input" value="<?php echo esc_attr($item['quantity']); ?>" min="0" data-product-code="<?php echo esc_attr($item['code']); ?>">
+                                                <button type="button" class="update-quantity-increase">+</button>
                                             </div>
                                         </form>
                                     </td>
-                                    <td><?php echo esc_html($item['formatted_price']); ?></td>
-                                    <td>CHF <?php echo esc_html(number_format($item['total'], 2)); ?></td>
-                                    <td>
+                                    <td data-label="Price"><?php echo esc_html($item['formatted_price']); ?></td>
+                                    <td data-label="Total">CHF <?php echo esc_html(number_format($item['total'], 2)); ?></td>
+                                    <td data-label="Actions">
                                         <form class="remove-item-form" method="post" action="">
                                             <input type="hidden" name="product_code" value="<?php echo esc_attr($item['code']); ?>">
                                             <button type="submit" class="remove-item" aria-label="Remove item">Remove</button>
@@ -148,9 +120,11 @@ get_header(); ?>
                     </div>
                     <?php
                     if (WP_DEBUG) {
-                        error_log('ITU Shop: Cart displayed - Items: ' . count($cart_items) . ', Total: CHF ' . number_format($cart_total, 2));
+                        error_log('ITU Shop: Cart displayed - Items: ' . count($cart_items_details) . ', Total: CHF ' . number_format($cart_total, 2));
                     }
                 }
+            } else {
+                echo '<p>Error: Could not retrieve product information for cart items.</p>';
             }
         }
     }

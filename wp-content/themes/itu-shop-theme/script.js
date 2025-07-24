@@ -8,271 +8,254 @@ document.addEventListener('DOMContentLoaded', function() {
     const grid = document.getElementById('product-grid');
     const searchInput = document.getElementById('search-input');
     const searchButton = document.getElementById('search-button');
+    const categoryFilter = document.getElementById('category-filter'); // Ensure this element is selected
 
-    if (!grid || !searchInput || !searchButton) {
-        console.error('Required elements not found:', { grid: !!grid, searchInput: !!searchInput, searchButton: !!searchButton });
+    if (!grid || !searchInput || !searchButton || !categoryFilter) {
+        console.error('Required elements not found:', { grid: !!grid, searchInput: !!searchInput, searchButton: !!searchButton, categoryFilter: !!categoryFilter });
         grid.innerHTML = '<p>Error: Page elements not found</p>';
         return;
     }
 
-    if (!ituAjax || !ituAjax.rest_url || !ituAjax.nonce || !ituAjax.home_url) {
+    // Corrected ituAjax check to ensure all necessary properties are present
+    if (!ituAjax || !ituAjax.rest_url || !ituAjax.categories_url || !ituAjax.nonce || !ituAjax.home_url) {
         console.error('ituAjax not properly initialized:', { ituAjax });
         grid.innerHTML = '<p>Error: Script initialization failed</p>';
         return;
     }
-    console.log('ituAjax:', { rest_url: ituAjax.rest_url, nonce: ituAjax.nonce, home_url: ituAjax.home_url });
+    console.log('ituAjax:', { rest_url: ituAjax.rest_url, categories_url: ituAjax.categories_url, nonce: ituAjax.nonce, home_url: ituAjax.home_url });
 
     const urlParams = new URLSearchParams(window.location.search);
     const initialQuery = urlParams.get('query') || '';
+    const initialCategory = urlParams.get('category') || ''; // Get initial category from URL
     const initialPage = parseInt(urlParams.get('page')) || 0;
-    console.log('Initial params:', { query: initialQuery, page: initialPage });
+    console.log('Initial params:', { query: initialQuery, category: initialCategory, page: initialPage });
 
-    let productCache = {};
+    let productCache = {}; // Cache for products (though not fully implemented for caching in this snippet)
 
     // Debounce function to limit API calls
     function debounce(func, wait) {
         let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
+        return function(...args) {
+            const context = this;
             clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
+            timeout = setTimeout(() => func.apply(context, args), wait);
         };
     }
 
-    // Handle search
-    searchButton.addEventListener('click', function() {
-        const query = searchInput.value.trim();
-        fetchProducts(initialPage, query);
-    });
+    // Function to fetch and display products
+    function fetchProducts(page = 0, category = '', query = '') {
+        console.log('ITU Shop: Fetching products with:', { page, category, query });
 
-    searchInput.addEventListener('keyup', function(event) {
-        if (event.key === 'Enter') {
-            const query = searchInput.value.trim();
-            fetchProducts(initialPage, query);
+        let apiUrl = ituAjax.rest_url;
+        const params = new URLSearchParams();
+        params.append('page', page);
+        if (query) {
+            params.append('query', query);
         }
-    });
+        if (category) {
+            // If a category is selected, the API query parameter changes
+            params.append('category', category);
+        }
+        apiUrl += '?' + params.toString();
 
-    // Real-time search on input
-    const debouncedFetchProducts = debounce((query) => {
-        fetchProducts(initialPage, query);
-    }, 300);
-
-    searchInput.addEventListener('input', function() {
-        const query = searchInput.value.trim();
-        console.log('ITU Shop: Real-time search triggered:', { query });
-        debouncedFetchProducts(query);
-    });
-
-    // Initial fetch
-    fetchProducts(initialPage, initialQuery);
-
-    async function fetchProducts(page, query = '') {
-        grid.innerHTML = '<div class="loading">Loading...</div>';
-
-        let filteredProducts = [];
-        let totalPages = 1;
-        let totalProducts = 0;
-        let currentPage = parseInt(page) || 0;
-        let links = {};
-
-        const cacheKey = `${currentPage}_${query || 'all'}`;
-        let data;
-
-        if (productCache[cacheKey]) {
-            console.log(`Using cached products for page ${currentPage}, query: ${query || 'none'}`);
-            data = productCache[cacheKey];
+        // Update URL in browser history
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.set('page', page);
+        if (query) {
+            newUrl.searchParams.set('query', query);
         } else {
-            try {
-                // Handle product ID search (numeric query)
-                if (query && /^\d+$/.test(query)) {
-                    const apiUrl = `${ituAjax.rest_url}/${encodeURIComponent(query)}`;
-                    console.log('Fetching product by ID from:', apiUrl);
-                    const response = await fetch(apiUrl, {
-                        method: 'GET',
-                        headers: { 'X-WP-Nonce': ituAjax.nonce }
-                    });
-                    console.log('Product response:', { status: response.status, ok: response.ok });
-                    const text = await response.text();
-                    try {
-                        data = JSON.parse(text);
-                    } catch (e) {
-                        console.error('Parse error:', e, 'Response text:', text.substring(0, 200));
-                        throw new Error('Invalid JSON response');
-                    }
-                    if (!response.ok || !data.code) {
-                        console.error('Error fetching product:', data.message || 'Product not found', 'Status:', response.status);
-                        grid.innerHTML = `<p>No products found for '${escapeHtml(query)}'</p>`;
-                        updateCategoryMessage(query, 0);
-                        updatePaginationLinks(currentPage, 1, {}, query);
-                        return;
-                    }
-                    // Wrap single product in array for consistency
-                    data = { products: [data], total_pages: 1, total_results: 1, links: {} };
-                } else {
-                    // Handle name search or all products
-                    const apiUrl = `${ituAjax.rest_url}?page=${currentPage}&pageSize=12`;
-                    console.log('Fetching products from:', apiUrl);
-                    const response = await fetch(apiUrl, {
-                        method: 'GET',
-                        headers: { 'X-WP-Nonce': ituAjax.nonce }
-                    });
-                    console.log('Products response:', { status: response.status, ok: response.ok });
-                    const text = await response.text();
-                    try {
-                        data = JSON.parse(text);
-                    } catch (e) {
-                        console.error('Parse error:', e, 'Response text:', text.substring(0, 200));
-                        throw new Error('Invalid JSON response');
-                    }
-                    if (!response.ok || !data.products) {
-                        console.error('Error fetching products:', data.message || 'Unknown error', 'Status:', response.status);
-                        grid.innerHTML = `<p>No products found${query ? ` for '${escapeHtml(query)}'` : ''}</p>`;
-                        updateCategoryMessage(query, 0);
-                        updatePaginationLinks(currentPage, 1, {}, query);
-                        return;
-                    }
+            newUrl.searchParams.delete('query');
+        }
+        if (category) {
+            newUrl.searchParams.set('category', category);
+        } else {
+            newUrl.searchParams.delete('category');
+        }
+        window.history.pushState({ page, category, query }, '', newUrl.toString());
+
+        fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'X-WP-Nonce': ituAjax.nonce
                 }
-                productCache[cacheKey] = data;
-            } catch (error) {
-                console.error('Products fetch error:', error.message);
-                grid.innerHTML = `<p>Error loading products: ${error.message}</p>`;
-                updateCategoryMessage(query, 0);
-                updatePaginationLinks(currentPage, 1, {}, query);
-                return;
-            }
-        }
-
-        // Filter products for name search
-        filteredProducts = query && !/^\d+$/.test(query)
-            ? data.products.filter(product => product.name.toLowerCase().includes(query.toLowerCase())).slice(0, 12)
-            : data.products;
-
-        totalPages = query && !/^\d+$/.test(query)
-            ? Math.ceil(data.total_results / 12)
-            : data.total_pages || 1;
-        totalProducts = query && !/^\d+$/.test(query)
-            ? Math.min(data.total_results, filteredProducts.length)
-            : (data.total_results || filteredProducts.length);
-        links = data.links || {
-            prev: currentPage > 0 ? `${ituAjax.rest_url}?page=${currentPage - 1}${query ? '&query=' + encodeURIComponent(query) : ''}` : null,
-            next: currentPage < totalPages - 1 ? `${ituAjax.rest_url}?page=${currentPage + 1}${query ? '&query=' + encodeURIComponent(query) : ''}` : null
-        };
-
-        console.log('Pagination debug:', { totalProducts, totalPages, currentPage, filteredProducts: filteredProducts.length });
-
-        updateCategoryMessage(query, totalProducts);
-        renderProducts(filteredProducts);
-        updatePaginationLinks(currentPage, totalPages, links, query);
-        console.log(`Loaded ${filteredProducts.length} products for page ${currentPage}, query: ${query || 'none'}`);
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('ITU Shop: Products fetched:', data);
+                displayProducts(data.products);
+                renderPagination(data.pagination.currentPage, data.pagination.totalPages, category, query); // Pass category and query
+            })
+            .catch(error => {
+                console.error('ITU Shop: Error fetching products:', error);
+                grid.innerHTML = '<p class="error-message">Failed to load products. Please try again later.</p>';
+            });
     }
 
-    function updateCategoryMessage(query, totalProducts) {
-        const productGrid = document.querySelector('.product-grid');
-        let messageDiv = document.querySelector('.category-message');
-        if (!messageDiv) {
-            messageDiv = document.createElement('div');
-            messageDiv.className = 'category-message';
-            productGrid.parentNode.insertBefore(messageDiv, productGrid);
-        }
-        messageDiv.textContent = query ? `Showing ${totalProducts} products for '${escapeHtml(query)}'` : `Showing ${totalProducts} products`;
-    }
-
-    function renderProducts(products) {
-        if (!products || products.length === 0) {
-            grid.innerHTML = '<p>No products available.</p>';
+    // Function to display products
+    function displayProducts(products) {
+        if (!grid) return; // defensive check
+        grid.innerHTML = ''; // Clear existing products
+        if (products.length === 0) {
+            grid.innerHTML = '<p class="no-results">No products found.</p>';
             return;
         }
-
-        let html = '';
         products.forEach(product => {
-            const title = product.name || 'Unnamed Product';
-            const price = product.price?.value || '0.00';
-            const currency = product.price?.currencyIso || 'CHF';
-            const stockStatus = product.stock?.stockLevelStatus || 'unknown';
-            const productCode = product.code || '';
-            const productUrl = `${ituAjax.home_url}product/${encodeURIComponent(productCode)}`;
-
-            html += `
-                <div class="product-card">
-                    <div class="image-placeholder"></div>
-                    <h3>${escapeHtml(title)}</h3>
-                    <p class="price">${escapeHtml(numberFormat(price, 2))} ${escapeHtml(currency)}</p>
-                    <p class="stock-status">Stock: ${escapeHtml(stockStatus)}</p>
-                    <a href="${escapeHtml(productUrl)}" class="product-link" data-product-code="${escapeHtml(productCode)}">${escapeHtml(title)}</a>
-                </div>
+            const productCard = document.createElement('div');
+            productCard.className = 'product-card';
+            productCard.innerHTML = `
+                <a href="${ituAjax.home_url}product/${product.code}" class="product-link">
+                    <img src="${product.image_url}" alt="${product.name}" class="product-image">
+                    <h3 class="product-name">${product.name}</h3>
+                </a>
+                <p class="product-price">${product.price}</p>
+                <p class="stock-status">Stock: ${product.stock_status}</p>
             `;
+            grid.appendChild(productCard);
         });
-        grid.innerHTML = html;
     }
 
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    function numberFormat(value, decimals) {
-        return Number(value).toFixed(decimals);
-    }
-
-    function updatePaginationLinks(currentPage, totalPages, links, query = '') {
+    // Function to render pagination
+    function renderPagination(currentPage, totalPages, currentCategory, currentQuery) {
         const paginationDiv = document.querySelector('.pagination');
-        currentPage = parseInt(currentPage) || 0;
-        totalPages = parseInt(totalPages) || 1;
+        if (!paginationDiv) return;
 
         let html = '';
-        const baseUrl = removeQueryParam(window.location.href, 'page');
+        const prevPage = currentPage - 1;
+        const nextPage = currentPage + 1;
 
-        if (links.prev) {
-            const prevPage = currentPage - 1;
-            const prevUrl = addQueryParam(baseUrl, ['page', prevPage, 'query', query]);
-            html += `<a href="${prevUrl}" class="pagination-link" data-page="${prevPage}" data-query="${encodeURIComponent(query)}">Previous</a>`;
+        if (currentPage > 0) {
+            // Ensure addQueryParam properly handles all parameters
+            const prevUrl = addQueryParam(window.location.href, { page: prevPage, category: currentCategory, query: currentQuery });
+            html += `<a href="${prevUrl}" class="pagination-link" data-page="${prevPage}" data-category="${encodeURIComponent(currentCategory)}" data-query="${encodeURIComponent(currentQuery)}">Previous</a>`;
         } else {
             html += `<span class="pagination-link disabled">Previous</span>`;
         }
 
         html += `<span class="page-info">Page ${currentPage + 1} of ${totalPages}</span>`;
 
-        if (links.next) {
-            const nextPage = currentPage + 1;
-            const nextUrl = addQueryParam(baseUrl, ['page', nextPage, 'query', query]);
-            html += `<a href="${nextUrl}" class="pagination-link" data-page="${nextPage}" data-query="${encodeURIComponent(query)}">Next</a>`;
+        if (currentPage < totalPages - 1 && totalPages > 1) {
+            // Ensure addQueryParam properly handles all parameters
+            const nextUrl = addQueryParam(window.location.href, { page: nextPage, category: currentCategory, query: currentQuery });
+            html += `<a href="${nextUrl}" class="pagination-link" data-page="${nextPage}" data-category="${encodeURIComponent(currentCategory)}" data-query="${encodeURIComponent(currentQuery)}">Next</a>`;
         } else {
             html += `<span class="pagination-link disabled">Next</span>`;
         }
 
-        paginationDiv.innerHTML = html;
-        console.log('Pagination links rendered:', { html, currentPage, totalPages, links, query });
+        paginationDiv.innerHTML = html; // Replace existing pagination with new
+        console.log('Pagination links rendered:', { html, currentPage, totalPages, currentCategory, currentQuery });
 
         document.querySelectorAll('.pagination-link:not(.disabled)').forEach(link => {
             link.addEventListener('click', function(e) {
                 e.preventDefault();
-                const page = this.getAttribute('data-page');
-                const q = decodeURIComponent(this.getAttribute('data-query'));
-                console.log('Pagination clicked:', { page, query: q });
-                fetchProducts(page, q);
+                const page = parseInt(this.getAttribute('data-page'));
+                const cat = decodeURIComponent(this.getAttribute('data-category') || '');
+                const q = decodeURIComponent(this.getAttribute('data-query') || '');
+                console.log('Pagination clicked:', { page, category: cat, query: q });
+                fetchProducts(page, cat, q); // Pass all three parameters
             });
         });
     }
 
-    function removeQueryParam(url, param) {
-        const urlObj = new URL(url);
-        urlObj.searchParams.delete(param);
-        return urlObj.toString();
+    // Fixed addQueryParam function to handle object of parameters
+    function addQueryParam(baseUrl, paramsObj) {
+        const url = new URL(baseUrl);
+        for (const key in paramsObj) {
+            if (paramsObj[key]) {
+                url.searchParams.set(key, encodeURIComponent(paramsObj[key]));
+            } else {
+                url.searchParams.delete(key);
+            }
+        }
+        return url.toString();
     }
 
-    function addQueryParam(baseUrl, param) {
-        const url = new URL(baseUrl);
-        if (Array.isArray(param)) {
-            url.searchParams.set('page', param[1]);
-            if (param[3]) url.searchParams.set('query', encodeURIComponent(param[3]));
-            else url.searchParams.delete('query');
-        } else {
-            url.searchParams.set(param, encodeURIComponent(param));
-        }
-        return url.toString;
+    // Function to normalize category names
+    function normalizeCategory(category) {
+        category = category.replace(/\s*\(\d+\)/g, ''); // Remove (count)
+        category = category.trim();
+        category = category.toLowerCase();
+        category = category.replace(/\s+/g, '-');
+        category = category.replace(/-$/, ''); // Remove trailing hyphen
+        return category;
     }
+
+    function normalizeCategoryName(name) {
+        return name.replace(/\s*\(\d+\)/g, '').trim(); // Remove count and trim
+    }
+
+    // Initial product fetch based on URL parameters
+    fetchProducts(initialPage, initialCategory, initialQuery);
+
+    // Category filter logic
+    console.log('Fetching categories from:', ituAjax.categories_url);
+    fetch(ituAjax.categories_url, {
+            method: 'GET',
+            headers: {
+                'X-WP-Nonce': ituAjax.nonce
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('ITU Shop: Categories fetched:', data);
+            // Assuming categoriesData is used if needed elsewhere
+            renderCategoryFilter(data, initialCategory); // Render initial filter with counts
+        })
+        .catch(error => {
+            console.error('ITU Shop: Error fetching categories:', error);
+            categoryFilter.innerHTML = '<li>Categories Unavailable: Failed to load.</li>';
+        });
+
+    function renderCategoryFilter(categories, activeCategoryCode) {
+        categoryFilter.innerHTML = ''; // Clear existing filters
+        const allProductsLi = document.createElement('li');
+        allProductsLi.className = 'category-item' + (activeCategoryCode === '' ? ' active' : '');
+        allProductsLi.dataset.category = '';
+        allProductsLi.innerHTML = `All Products`;
+        categoryFilter.appendChild(allProductsLi);
+
+        categories.forEach(cat => {
+            const li = document.createElement('li');
+            li.className = 'category-item' + (normalizeCategory(cat.name) === activeCategoryCode ? ' active' : '');
+            li.dataset.category = normalizeCategory(cat.name);
+            li.innerHTML = `${normalizeCategoryName(cat.name)} <span>(${cat.count})</span>`;
+            categoryFilter.appendChild(li);
+        });
+
+        document.querySelectorAll('.category-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.category-item').forEach(li => li.classList.remove('active'));
+                this.classList.add('active');
+                const selectedCategory = this.dataset.category;
+                console.log('Category selected:', selectedCategory);
+                // Fetch products for selected category, reset page to 0, keep current search query
+                fetchProducts(0, selectedCategory, initialQuery);
+            });
+        });
+    }
+
+    // Search functionality
+    const debouncedSearch = debounce(() => {
+        const query = searchInput.value.trim();
+        console.log('ITU Shop: Performing search:', query);
+        // Search should reset page to 0, keep current category
+        fetchProducts(0, initialCategory, query);
+    }, 500);
+
+    searchInput.addEventListener('input', debouncedSearch);
+    searchButton.addEventListener('click', function() {
+        const query = searchInput.value.trim();
+        console.log('ITU Shop: Search button clicked, performing search:', query);
+        // Search should reset page to 0, keep current category
+        fetchProducts(0, initialCategory, query);
+    });
 });
