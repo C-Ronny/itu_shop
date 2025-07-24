@@ -29,6 +29,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let productCache = {};
 
+    // Debounce function to limit API calls
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
     // Handle search
     searchButton.addEventListener('click', function() {
         const query = searchInput.value.trim();
@@ -40,6 +53,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const query = searchInput.value.trim();
             fetchProducts(initialPage, query);
         }
+    });
+
+    // Real-time search on input
+    const debouncedFetchProducts = debounce((query) => {
+        fetchProducts(initialPage, query);
+    }, 300);
+
+    searchInput.addEventListener('input', function() {
+        const query = searchInput.value.trim();
+        console.log('ITU Shop: Real-time search triggered:', { query });
+        debouncedFetchProducts(query);
     });
 
     // Initial fetch
@@ -123,11 +147,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Filter products for name search
         filteredProducts = query && !/^\d+$/.test(query)
-            ? data.products.filter(product => product.name.toLowerCase().includes(query.toLowerCase()))
+            ? data.products.filter(product => product.name.toLowerCase().includes(query.toLowerCase())).slice(0, 12)
             : data.products;
 
-        totalPages = data.total_pages || 1;
-        totalProducts = query && !/^\d+$/.test(query) ? filteredProducts.length : (data.total_results || filteredProducts.length);
+        totalPages = query && !/^\d+$/.test(query)
+            ? Math.ceil(data.total_results / 12)
+            : data.total_pages || 1;
+        totalProducts = query && !/^\d+$/.test(query)
+            ? Math.min(data.total_results, filteredProducts.length)
+            : (data.total_results || filteredProducts.length);
         links = data.links || {
             prev: currentPage > 0 ? `${ituAjax.rest_url}?page=${currentPage - 1}${query ? '&query=' + encodeURIComponent(query) : ''}` : null,
             next: currentPage < totalPages - 1 ? `${ituAjax.rest_url}?page=${currentPage + 1}${query ? '&query=' + encodeURIComponent(query) : ''}` : null
