@@ -4,7 +4,7 @@
  */
 get_header(); ?>
 <div class="cart-page">
-    <div class="back-arrow" style="margin-top:2rem">
+    <div class="back-arrow" style="margin-top:3rem; font-size:0.9rem">
         <a href="<?php echo esc_url(home_url('/')); ?>" title="Back to Home">← Back</a>
     </div>
     <h1 class="cart-title">Your Cart</h1>
