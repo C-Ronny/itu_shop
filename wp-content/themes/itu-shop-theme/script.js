@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
         grid.innerHTML = '<p>Error: Script initialization failed</p>';
         return;
     }
-    console.log('ituAjax:', { rest_url: ituAjax.rest_url, nonce: iuAjax.nonce, home_url: ituAjax.home_url });
+    console.log('ituAjax:', { rest_url: ituAjax.rest_url, nonce: ituAjax.nonce, home_url: ituAjax.home_url });
 
     const urlParams = new URLSearchParams(window.location.search);
     const initialQuery = urlParams.get('query') || '';
