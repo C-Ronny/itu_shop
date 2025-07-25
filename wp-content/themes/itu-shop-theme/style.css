@@ -313,14 +313,14 @@ footer {
 }
 
 .back-arrow a {
-    color: #4B92DB;
+    color: #000000;
     text-decoration: none;
     font-weight: bold;
     font-size: 1rem;
 }
 
 .back-arrow a:hover {
-    text-decoration: underline;
+    color:#4B92DB;    
 }
 
 .product-details-container {
