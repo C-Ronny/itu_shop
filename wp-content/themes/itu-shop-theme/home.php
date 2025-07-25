@@ -3,8 +3,8 @@
  * Template Name: Home Page
  */
 get_header(); ?>
-<div class="home-content">
-    <h1 id="welcome">Welcome to ITU Shop</h1>
+<main class="home-content">
+    <h1 id="welcome">Welcome to the ITU Shop</h1>
     <div class="search-container">
         <input type="text" id="search-input" placeholder="Search by product ID or name" value="<?php echo esc_attr(isset($_GET['query']) ? $_GET['query'] : ''); ?>">
         <button id="search-button">Search</button>
@@ -18,7 +18,7 @@ get_header(); ?>
         echo '<p class="error-message">Error: API credentials not configured in wp-config.php</p>';
     } else {
         // These PHP variables are for the initial server-side render or if JavaScript fails.
-        // The JavaScript (script.js) will take over dynamic loading and pagination.
+        // The JavaScript (itu-shop.js) will take over dynamic loading and pagination.
         $current_page = isset($_GET['page']) && is_numeric($_GET['page']) && $_GET['page'] >= 0 ? intval($_GET['page']) : 0;
         $query = isset($_GET['query']) ? sanitize_text_field($_GET['query']) : '';
         $category = isset($_GET['category']) ? sanitize_text_field($_GET['category']) : '';
@@ -32,6 +32,7 @@ get_header(); ?>
             echo '<p class="error-message">No products found matching your criteria.</p>';
         } else {
             ?>
+            <!-- Assumes API image field is in $product['images']. If different (e.g., 'image_url'), update the image logic in this loop and in itu-shop.js renderProducts function -->
             <div id="product-grid" class="product-grid">
                 <?php
                 foreach ($products as $product) {
@@ -51,17 +52,16 @@ get_header(); ?>
                     }
 
                     echo '<div class="product-card">';
-                    echo '<div class="product-image-container">';
+                    echo '<a href="' . esc_url(home_url('/product/' . $product_code)) . '" class="product-link" data-product-code="' . esc_attr($product_code) . '">';
                     if ($image_url) {
                         echo '<img src="' . esc_url($image_url) . '" alt="' . esc_attr($title) . '" class="product-image">';
                     } else {
-                        echo '<div class="no-image-placeholder">No Image Available</div>';
+                        echo '<div class="product-card-placeholder">No image</div>';
                     }
-                    echo '</div>'; // .product-image-container
-                    echo '<h2 class="product-title">' . esc_html($title) . '</h2>';
+                    echo '<h2 class="product-name">' . esc_html($title) . '</h2>';
                     echo '<p class="product-price">' . esc_html($currency) . ' ' . esc_html(number_format($price_value, 2)) . '</p>';
                     echo '<p class="stock-status">Stock: ' . esc_html($stock_status) . '</p>';
-                    echo '<a href="' . esc_url(home_url('/product/' . $product_code)) . '" class="product-link" data-product-code="' . esc_attr($product_code) . '">View Details</a>';
+                    echo '</a>';
                     echo '</div>';
                 }
                 ?>
@@ -98,5 +98,5 @@ get_header(); ?>
         }
     }
     ?>
-</div>
+</main>
 <?php get_footer(); ?>

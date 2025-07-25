@@ -211,6 +211,20 @@ nav ul li a:hover {
     border-bottom: 1px solid #eee;
 }
 
+.product-card-placeholder {
+    width: 100%;
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f0f0f0; /* Slightly different from single product page */
+    border-bottom: 1px solid #eee;
+    padding: 1rem;
+    font-size: 1rem; /* Smaller than single product page */
+    color: #555;
+    text-align: center;
+}
+
 .product-name {
     font-size: 1.2rem;
     color: #333;
@@ -830,7 +844,8 @@ footer {
         font-size: 1.5rem;
     }
 
-    .product-image {
+    .product-image,
+    .product-card-placeholder {
         max-height: 250px; /* Adjusted height for very small screens */
     }
 
