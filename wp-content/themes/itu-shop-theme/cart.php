@@ -116,7 +116,7 @@ get_header(); ?>
                     </table>
                     <div class="cart-totals">
                         <p>Total: <span class="cart-total-amount">CHF <?php echo esc_html(number_format($cart_total, 2)); ?></span></p>
-                        <p class="checkout-placeholder">Proceed to Checkout coming soon.</p>
+                        <a href="<?php echo esc_url(home_url('/checkout')); ?>" class="add-to-cart">Proceed to Checkout</a>
                     </div>
                     <?php
                     if (WP_DEBUG) {
