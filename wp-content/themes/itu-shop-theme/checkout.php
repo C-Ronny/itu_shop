@@ -130,7 +130,7 @@ get_header(); ?>
                                 </div>
                                 <button type="submit" class="add-to-cart">Submit Order</button>
                             </form>
-                            <p class="checkout-placeholder">Payment processing coming soon.</p>
+                            <!-- <p class="checkout-placeholder">Payment processing coming soon.</p> -->
                         </div>
                     </div>
                     <!-- Modal for prototype notice -->

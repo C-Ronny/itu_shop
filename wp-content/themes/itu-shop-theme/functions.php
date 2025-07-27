@@ -16,17 +16,17 @@ add_action('after_setup_theme', 'itu_shop_theme_setup');
 
 // Enqueue Styles
 function itu_shop_theme_styles() {
-    wp_enqueue_style('itu-shop-theme-style', get_template_directory_uri() . '/style.css', array(), '1.1.1'); // Updated version
+    wp_enqueue_style('itu-shop-theme-style', get_template_directory_uri() . '/style.css', array(), '1.1.1');
 }
 add_action('wp_enqueue_scripts', 'itu_shop_theme_styles');
 
 // Enqueue Scripts and Localize
 function itu_shop_theme_scripts() {
     if (is_page_template('home.php')) {
-        wp_enqueue_script('itu-shop-theme-script', get_template_directory_uri() . '/script.js', array(), '1.1.1', true); // Updated version
+        wp_enqueue_script('itu-shop-theme-script', get_template_directory_uri() . '/script.js', array(), '1.1.1', true);
         wp_localize_script('itu-shop-theme-script', 'ituAjax', array(
             'rest_url' => rest_url('itu/v1/products'),
-            'categories_url' => rest_url('itu/v1/categories'), // Ensure categories URL is localized
+            'categories_url' => rest_url('itu/v1/categories'),
             'nonce' => wp_create_nonce('wp_rest'),
             'home_url' => home_url('/')
         ));
@@ -37,11 +37,18 @@ function itu_shop_theme_scripts() {
     }
     // Enqueue script-cart.js on both cart and single product pages
     if (get_query_var('itu_cart') || (get_query_var('itu_product') && get_query_var('product_code'))) {
-        wp_enqueue_script('itu-shop-cart-script', get_template_directory_uri() . '/script-cart.js', array(), '1.0.1', true); // Updated version
+        wp_enqueue_script('itu-shop-cart-script', get_template_directory_uri() . '/script-cart.js', array(), '1.0.1', true);
         wp_localize_script('itu-shop-cart-script', 'ituAjax', array(
             'rest_url_cart_add' => rest_url('itu/v1/cart/add'),
             'rest_url_cart_update' => rest_url('itu/v1/cart/update'),
             'rest_url_cart_remove' => rest_url('itu/v1/cart/remove'),
+            'nonce' => wp_create_nonce('wp_rest')
+        ));
+    }
+    // Enqueue script-checkout.js only on the checkout page
+    if (get_query_var('itu_checkout')) {
+        wp_enqueue_script('itu-shop-checkout-script', get_template_directory_uri() . '/script-checkout.js', array(), '1.0', true);
+        wp_localize_script('itu-shop-checkout-script', 'ituAjax', array(
             'nonce' => wp_create_nonce('wp_rest')
         ));
     }
@@ -61,7 +68,6 @@ function itu_debug_rest_registration() {
     }
 }
 add_action('rest_api_init', 'itu_debug_rest_registration');
-
 
 // Define API credentials
 if (!defined('ITU_API_CLIENT_ID')) {
@@ -83,7 +89,7 @@ function itu_get_access_token() {
             'Content-Type' => 'application/x-www-form-urlencoded',
         ),
         'method' => 'POST',
-        'timeout' => 15, // Increase timeout for API calls
+        'timeout' => 15,
     );
 
     $response = wp_remote_post($token_url, $args);
@@ -105,7 +111,7 @@ function itu_fetch_products_from_api($page = 0, $query = '', $category = '') {
     }
 
     $base_api_url = 'https://api.cisz6lfhs9-ituintern1-s1-public.model-t.cc.commerce.ondemand.com/occ/v2/itu';
-    $search_url = $base_api_url . '/products/search?pageSize=12&currentPage=' . intval($page); // pageSize=12 as per API integration
+    $search_url = $base_api_url . '/products/search?pageSize=12&currentPage=' . intval($page);
 
     if (!empty($query)) {
         $search_url .= '&query=' . urlencode($query);
@@ -117,9 +123,9 @@ function itu_fetch_products_from_api($page = 0, $query = '', $category = '') {
     $response = wp_remote_get($search_url, array(
         'headers' => array(
             'Authorization' => 'Bearer ' . $access_token,
-            'Cache-Control' => 'no-cache' // Bypass cache for product search
+            'Cache-Control' => 'no-cache'
         ),
-        'timeout' => 15, // Increase timeout for API calls
+        'timeout' => 15,
     ));
 
     if (is_wp_error($response)) {
@@ -148,7 +154,6 @@ function itu_products_rest_endpoint(WP_REST_Request $request) {
 
     $response_data = array(
         'products' => array_map(function($product) {
-            // Ensure necessary fields are present, provide defaults if not
             $price = $product['price']['formattedValue'] ?? 'N/A';
             $stock_status = $product['stock']['stockLevelStatus'] ?? 'Unknown';
             $product_code = $product['code'] ?? 'N/A';
@@ -176,7 +181,7 @@ function itu_products_rest_endpoint(WP_REST_Request $request) {
 // Function to fetch categories from Commerce API
 function itu_fetch_categories_from_api() {
     $categories = get_transient('itu_categories');
-    if ($categories === false) { // Only fetch if not in transient
+    if ($categories === false) {
         $access_token = itu_get_access_token();
         if (!$access_token) {
             return new WP_Error('rest_token_error', 'No access token received', array('status' => 500));
@@ -190,7 +195,7 @@ function itu_fetch_categories_from_api() {
                 'Authorization' => 'Bearer ' . $access_token,
                 'Cache-Control' => 'no-cache'
             ),
-            'timeout' => 15, // Increase timeout
+            'timeout' => 15,
         ));
 
         if (is_wp_error($response)) {
@@ -200,11 +205,10 @@ function itu_fetch_categories_from_api() {
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
         $categories = $body['categories'] ?? [];
-        set_transient('itu_categories', $categories, DAY_IN_SECONDS); // Cache for a day
+        set_transient('itu_categories', $categories, DAY_IN_SECONDS);
     }
     return $categories;
 }
-
 
 // Function to get category counts based on current cart
 function itu_get_category_counts() {
@@ -214,14 +218,10 @@ function itu_get_category_counts() {
     $cart_items = $_SESSION['itu_cart'] ?? [];
     $counts = [];
 
-    // Fetch all products to get their categories - NOTE: This fetches only the first page.
-    // For accurate counts across all products, a more robust API call or caching strategy would be needed.
-    // For now, it will base counts on products returned by the initial product search API call.
     $all_products_data = itu_fetch_products_from_api(0, '', '');
     $all_products = $all_products_data['products'] ?? [];
 
     foreach ($cart_items as $product_code => $quantity) {
-        // Find the product in the fetched data to get its categories
         $found_product = null;
         foreach ($all_products as $product) {
             if ($product['code'] === $product_code) {
@@ -254,22 +254,19 @@ function itu_categories_rest_endpoint() {
 
     $counts = itu_get_category_counts();
     $filtered_categories = array_filter($categories, function($cat) {
-        // Exclude specific categories if necessary, e.g., 'Brands' or 'Configurations'
         return $cat['name'] !== 'Brands' && $cat['name'] !== 'Configurations';
     });
 
-    // Ensure response is always an array
     $response = array_values(array_map(function($cat) use ($counts) {
         return array(
             'id' => $cat['id'],
             'name' => $cat['name'],
-            'count' => $counts[$cat['name']] ?? 0 // Get count from the calculated counts
+            'count' => $counts[$cat['name']] ?? 0
         );
     }, $filtered_categories));
 
     return new WP_REST_Response($response, 200);
 }
-
 
 // Internal function for adding to cart
 function itu_add_to_cart_rest_internal($product_code, $quantity) {
@@ -281,9 +278,8 @@ function itu_add_to_cart_rest_internal($product_code, $quantity) {
         $_SESSION['itu_cart'] = array();
     }
 
-    $product_code = trim($product_code); // Trim whitespace
+    $product_code = trim($product_code);
 
-    // Add or update product quantity
     if (isset($_SESSION['itu_cart'][$product_code])) {
         $_SESSION['itu_cart'][$product_code] += $quantity;
     } else {
@@ -304,13 +300,12 @@ function itu_add_to_cart_rest_internal($product_code, $quantity) {
 // REST API Endpoint for adding to cart
 function itu_add_to_cart_rest(WP_REST_Request $request) {
     $product_code = sanitize_text_field($request->get_param('product_code'));
-    $quantity = absint($request->get_param('quantity')); // Ensure quantity is a positive integer
+    $quantity = absint($request->get_param('quantity'));
 
     if (empty($product_code) || $quantity <= 0) {
         return new WP_Error('rest_invalid_data', 'Invalid product code or quantity', array('status' => 400));
     }
 
-    // Nonce verification
     if (!wp_verify_nonce($request->get_header('X-WP-Nonce'), 'wp_rest')) {
         return new WP_Error('rest_forbidden', 'Nonce verification failed', array('status' => 403));
     }
@@ -318,8 +313,7 @@ function itu_add_to_cart_rest(WP_REST_Request $request) {
     return itu_add_to_cart_rest_internal($product_code, $quantity);
 }
 
-
-// Internal function for removing from cart (can be called by update if quantity is 0)
+// Internal function for removing from cart
 function itu_remove_from_cart_rest_internal($product_code) {
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
@@ -343,7 +337,6 @@ function itu_remove_from_cart_rest_internal($product_code) {
     );
 }
 
-
 // REST API Endpoint for updating cart quantity
 function itu_update_cart_quantity_rest(WP_REST_Request $request) {
     $nonce = $request->get_header('X-WP-Nonce');
@@ -356,7 +349,6 @@ function itu_update_cart_quantity_rest(WP_REST_Request $request) {
     $quantity = absint($request->get_param('quantity'));
 
     if ($quantity <= 0) {
-        // If quantity is 0 or less, treat it as a remove request
         return itu_remove_from_cart_rest_internal($product_code);
     }
 
@@ -394,19 +386,18 @@ function itu_remove_from_cart_rest(WP_REST_Request $request) {
     return itu_remove_from_cart_rest_internal($product_code);
 }
 
-
 // Register REST API Endpoints
 function itu_shop_register_rest_routes() {
     register_rest_route('itu/v1', '/products', array(
         'methods' => 'GET',
         'callback' => 'itu_products_rest_endpoint',
-        'permission_callback' => '__return_true', // No specific permission needed for product listings
+        'permission_callback' => '__return_true',
     ));
 
     register_rest_route('itu/v1', '/categories', array(
         'methods' => 'GET',
         'callback' => 'itu_categories_rest_endpoint',
-        'permission_callback' => '__return_true', // No specific permission needed for categories
+        'permission_callback' => '__return_true',
     ));
 
     register_rest_route('itu/v1', '/product/(?P<product_code>[a-zA-Z0-9-]+)', array(
@@ -447,7 +438,6 @@ function itu_shop_register_rest_routes() {
 }
 add_action('rest_api_init', 'itu_shop_register_rest_routes');
 
-
 // REST API Endpoint for Single Product
 function itu_get_single_product_rest_endpoint(WP_REST_Request $request) {
     $product_code = sanitize_text_field($request->get_param('product_code'));
@@ -463,9 +453,9 @@ function itu_get_single_product_rest_endpoint(WP_REST_Request $request) {
     $response = wp_remote_get($api_url, array(
         'headers' => array(
             'Authorization' => 'Bearer ' . $access_token,
-            'Cache-Control' => 'no-cache' // Bypass cache for product search
+            'Cache-Control' => 'no-cache'
         ),
-        'timeout' => 15, // Increase timeout for API calls
+        'timeout' => 15,
     ));
 
     if (is_wp_error($response)) {
@@ -482,8 +472,7 @@ function itu_get_single_product_rest_endpoint(WP_REST_Request $request) {
     return new WP_REST_Response($body, 200);
 }
 
-
-// Add custom rewrite rules for product and cart pages
+// Add custom rewrite rules for product, cart, and checkout pages
 function itu_shop_rewrite_rules() {
     add_rewrite_rule(
         '^product/([^/]+)/?$',
@@ -495,6 +484,11 @@ function itu_shop_rewrite_rules() {
         'index.php?itu_cart=1',
         'top'
     );
+    add_rewrite_rule(
+        '^checkout/?$',
+        'index.php?itu_checkout=1',
+        'top'
+    );
 }
 add_action('init', 'itu_shop_rewrite_rules');
 
@@ -503,6 +497,7 @@ function itu_shop_query_vars($vars) {
     $vars[] = 'itu_product';
     $vars[] = 'product_code';
     $vars[] = 'itu_cart';
+    $vars[] = 'itu_checkout';
     return $vars;
 }
 add_filter('query_vars', 'itu_shop_query_vars');
@@ -535,6 +530,19 @@ function itu_shop_template_include($template) {
             }
         }
     }
+    if (get_query_var('itu_checkout')) {
+        $new_template = locate_template('checkout.php');
+        if ($new_template) {
+            if (WP_DEBUG) {
+                error_log('ITU Shop: Loading checkout.php');
+            }
+            return $new_template;
+        } else {
+            if (WP_DEBUG) {
+                error_log('ITU Shop: checkout.php template not found');
+            }
+        }
+    }
     return $template;
 }
 add_filter('template_include', 'itu_shop_template_include');
@@ -560,3 +568,4 @@ function itu_shop_deactivate() {
     }
 }
 register_deactivation_hook(__FILE__, 'itu_shop_deactivate');
+?>
