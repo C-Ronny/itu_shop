@@ -129,8 +129,7 @@ get_header(); ?>
                                     <textarea id="address" name="address" required aria-required="true"></textarea>
                                 </div>
                                 <button type="submit" class="add-to-cart">Submit Order</button>
-                            </form>
-                            <!-- <p class="checkout-placeholder">Payment processing coming soon.</p> -->
+                            </form>                            
                         </div>
                     </div>
                     <!-- Modal for prototype notice -->

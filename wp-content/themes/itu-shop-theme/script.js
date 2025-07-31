@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const initialPage = parseInt(urlParams.get('page')) || 0;
     console.log('Initial params:', { query: initialQuery, category: initialCategory, page: initialPage });
 
-    let productCache = {}; // Cache for products (though not fully implemented for caching in this snippet)
+    // let productCache = {};
 
     // Debounce function to limit API calls
     function debounce(func, wait) {
@@ -206,8 +206,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(data => {
-            console.log('ITU Shop: Categories fetched:', data);
-            // Assuming categoriesData is used if needed elsewhere
+            // console.log('ITU Shop: Categories fetched:', data);
+            //  categoriesData
             renderCategoryFilter(data, initialCategory); // Render initial filter with counts
         })
         .catch(error => {
@@ -236,7 +236,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll('.category-item').forEach(li => li.classList.remove('active'));
                 this.classList.add('active');
                 const selectedCategory = this.dataset.category;
-                console.log('Category selected:', selectedCategory);
+                // console.log('Category selected:', selectedCategory);
                 // Fetch products for selected category, reset page to 0, keep current search query
                 fetchProducts(0, selectedCategory, initialQuery);
             });
@@ -246,16 +246,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Search functionality
     const debouncedSearch = debounce(() => {
         const query = searchInput.value.trim();
-        console.log('ITU Shop: Performing search:', query);
-        // Search should reset page to 0, keep current category
+        // console.log('ITU Shop: Performing search:', query);    
         fetchProducts(0, initialCategory, query);
     }, 500);
 
     searchInput.addEventListener('input', debouncedSearch);
     searchButton.addEventListener('click', function() {
         const query = searchInput.value.trim();
-        console.log('ITU Shop: Search button clicked, performing search:', query);
-        // Search should reset page to 0, keep current category
+        // console.log('ITU Shop: Search button clicked, performing search:', query);        
         fetchProducts(0, initialCategory, query);
     });
 });
